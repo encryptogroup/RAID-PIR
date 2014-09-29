@@ -7,7 +7,7 @@ RAID-PIR is an efficient implementation of [private information retrieval](https
 
 **Author**: [Daniel Demmler](http://www.ec-spride.tu-darmstadt.de/en/research-groups/engineering-cryptographic-protocols-group/staff/daniel-demmler/), TU Darmstadt / EC-SPRIDE / [ENCRYPTO](http://encrypto.de)
 
-Our implementation is an extension of [upPIR](https://uppir.poly.edu) and large parts of it were written by the upPIR maintainers. A big thanks to [Justin Cappos](mailto:jcappos@nyu.edu) for making the original upPIR code publicly available.
+Our implementation is an extension of [upPIR](https://uppir.poly.edu) and large parts of it were written by the upPIR maintainers. A big thanks to [Justin Cappos](https://isis.poly.edu/~jcappos/) for making the original upPIR code publicly available.
 
 **Our code will be published soon. We estimate a public release in late October 2014.**
 
