@@ -3,7 +3,7 @@ RAID-PIR
 
 RAID-PIR is an efficient implementation of [private information retrieval](https://en.wikipedia.org/wiki/Private_information_retrieval) with multiple servers.
 
-Details of the underyling protocols can be found in the paper "RAID-PIR: Practical Multi-Server PIR" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by 
+Details of the underlying protocols can be found in the paper "RAID-PIR: Practical Multi-Server PIR" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by: 
 * [Daniel Demmler](http://www.ec-spride.tu-darmstadt.de/en/research-groups/engineering-cryptographic-protocols-group/staff/daniel-demmler/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
 * [Amir Herzberg](https://sites.google.com/site/amirherzberg/), Bar Ilan University
 * [Thomas Schneider](http://www.thomaschneider.de/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
@@ -40,9 +40,9 @@ e.g. `vendor` where you run the vendor from, `mirror1`, `mirror2`, ..., and `cli
 You can also try to link the files to the different directories for easier editing, but this is **untested and may break things**!
 
 
-#### 1.3 Setting up the files to be distributed
+#### 1.3 Setting up the files to be distributed 1
 
-Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files`. Once the files to share are inside this directory you can create a manifest file.
+Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files/`. Once the files to share are inside this directory you can create a manifest file.
 
 Command: `python raidpir_create_manifest.py <DIR> <BLOCKSIZE> <IP>`
 
@@ -71,7 +71,7 @@ Command: `python raidpir_vendor.py --foreground`
 Example:
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/v$ python raidpir_vendor.py --foreground
+dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_vendor.py --foreground
 RAID-PIR Vendor v0.9.0
 Vendor Server started at 127.0.0.1 : 62293
 ```
@@ -116,7 +116,6 @@ RAID-PIR Client v0.9.0
 Mirrors:  [{'ip': '127.0.0.1', 'port': 62002}, {'ip': '127.0.0.1', 'port': 62003}, {'ip': '127.0.0.1', 'port': 62001}]
 Blocks to request: 25
 wrote 1.jpg
-
 ```
 
 Once you've retrieved the manifest, you can download other files without re-retrieving the manifest (assuming the files and the manifest haven't changed).
@@ -132,8 +131,8 @@ In case RAID-PIR still won't terminate properly, try `killall -9 python`. (**War
 
 You can then re-run the code and your changes will be taken into account.
 
+### 5. General Remarks
 
-### 5. Some General Remarks
 All RAID-PIR files that require command line arguments can be called with the argument `-h` or `--help` to display a list of all available options with a short description.
 
 Make sure the ports the vendor and mirror servers are listening on are actually open.
