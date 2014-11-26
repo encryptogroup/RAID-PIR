@@ -39,8 +39,7 @@ e.g. `vendor` where you run the vendor from, `mirror1`, `mirror2`, ..., and `cli
 
 You can also try to link the files to the different directories for easier editing, but this is **untested and may break things**!
 
-
-#### 1.3 Setting up the files to be distributed 1
+#### 1.3 Setting up the files to be distributed
 
 Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files/`. Once the files to share are inside this directory you can create a manifest file.
 
@@ -77,7 +76,6 @@ Vendor Server started at 127.0.0.1 : 62293
 ```
 
 In other terminals, you can run mirror instances as well.
-
 Change your terminal to the mirror's directory (such as `../mirror1`).
 
 Each mirror will need to know where to locate the mirror files, what ports to use, a copy of the manifest file,. 
