@@ -10,7 +10,7 @@ Details of the underyling protocols can be found in the paper "RAID-PIR: Practic
 
 This code is an extension of [upPIR](https://uppir.poly.edu) and large parts of it were written by the upPIR maintainers. A big thanks to [Justin Cappos](https://isis.poly.edu/~jcappos/) for making the original upPIR code publicly available.
 
-Please send code-related questions to Daniel Demmler[mailto:daniel.demmler@ec-spride.de]
+Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de)
 
 **Warning:** This code is **not** meant to be used for a productive environment and is intended for testing and demonstration purposes only.
 
