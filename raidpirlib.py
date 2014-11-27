@@ -103,12 +103,10 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 	nextprint = pt
 
 	for blocknum in xrange(blockcount):
-		# print blocknum, lastoffset
 
 		if blockcount > 99 and blocknum >= nextprint:
 			print blocknum, "/", blockcount, "done..."
 			nextprint = nextprint + pt
-			
 
 		while len(thisblock) < blocksize:
 
@@ -125,14 +123,11 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 				del thisfilecontents
 			else:
 				thisblock = thisblock + blocksize * "\0"
-
-
 		
 		# ... and check its hash
 		currenthashlist.append(find_hash(thisblock[:blocksize], hashalgorithm))
 
 		thisblock = thisblock[blocksize:]
-		
 
 	print "All blocks done."
 	return currenthashlist
@@ -416,9 +411,6 @@ def _remote_query_helper(serverlocation, command, defaultserverport):
 	serversocket.connect((serverhostname, serverport))
 
 	# then issue the relevant command
-
-	# print "SENDING to port", serverport, len(command), command.encode('hex') #TODO remove this
-
 	session.sendmessage(serversocket, command)
 
 	# and return the answer
@@ -427,7 +419,6 @@ def _remote_query_helper(serverlocation, command, defaultserverport):
 	serversocket.close()
 
 	return rawanswer
-
 
 
 def parse_manifest(rawmanifestdata):

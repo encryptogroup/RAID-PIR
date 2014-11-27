@@ -42,6 +42,8 @@
 
 import sys
 
+import traceback
+
 import optparse
 
 # Holds the mirror data and produces the XORed blocks
@@ -397,7 +399,7 @@ def parse_options():
 
 	parser.add_option("","--mirrorroot", dest="mirrorroot", type="string", 
 				metavar="dir", default=".", 
-				help="The base directory where all mirror files live under")
+				help="The base directory where all mirror files are located.")
 
 	parser.add_option("","--retrievemanifestfrom", dest="retrievemanifestfrom", 
 				type="string", metavar="vendorIP:port", default="",
@@ -504,8 +506,7 @@ def main():
 		try:
 			_send_mirrorinfo()
 		except Exception, e:
-			pass
-			#_log(str(e)+"\n"+str(traceback.format_tb(sys.exc_info()[2])))
+			_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 
 		time.sleep(_commandlineoptions.mirrorlistadvertisedelay)
 
@@ -521,5 +522,5 @@ if __name__ == '__main__':
 		print(str(type(e))+" "+str(e))
 		# this mess prints a not-so-nice traceback, but it does contain all 
 		# relevant info
-		#_log(str(e)+"\n"+str(traceback.format_tb(sys.exc_info()[2])))
+		_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 		sys.exit(1)
