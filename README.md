@@ -50,6 +50,7 @@ Example:
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/vendor$ ls ../files/
 1.jpg  1.pdf  2.jpg  2.pdf  3.jpg
+
 dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_create_manifest.py ../files/ 4096 127.0.0.1
 RAID-PIR create manifest v0.9.0
 Fileinfolist generation done.
@@ -118,14 +119,14 @@ wrote 1.jpg
 
 Once you've retrieved the manifest, you can download other files without re-retrieving the manifest (assuming the files and the manifest haven't changed).
 
-You can specify several optimizations for the client. So get a list of all options with short description run `python raidpir_client.py -h`. Please see our paper for a detailed explanation of how the optimizations work.
+You can specify several optimizations for the client. To get a list of all options with short description run `python raidpir_client.py -h`. Please see our paper for a detailed explanation of how the optimizations work.
 
 ### 4. Restarting the mirrors or vendor 
 
 You can try to use CTRL-C or CTRL-Z on some OSes to end the RAID-PIR processes. On other OSes, this will raise an exception but will not exit. Also, check your process manager and see if you really terminated the processes. Sometimes this doesn't work due to the multi-threading in RAID-PIR.
 
 A quick and dirty solution is to end all python processes using `killall python` (**Warning:** This will also end all other python processes, not just RAID-PIR!). 
-In case RAID-PIR still won't terminate properly, try `killall -9 python`. (**Warning:** This will most definitely also end all other python processes!) If you know how to solve this more elegantly, please let me know.
+In case RAID-PIR still won't terminate properly, try `killall -9 python` (**Warning:** This will most definitely also end all other python processes!). If you know how to solve this more elegantly, please let me know.
 
 You can then re-run the code and your changes will be taken into account.
 
