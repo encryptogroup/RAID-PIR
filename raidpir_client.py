@@ -75,6 +75,7 @@ import simplexorrequestor
 # for basename
 import os.path
 
+
 def _request_helper(rxgobj):
 	# Private helper to get requests. Multiple threads will execute this...
 	thisrequest = rxgobj.get_next_xorrequest()
@@ -329,6 +330,10 @@ def parse_options():
 	parser.add_option("","--retrievemanifestfrom", dest="retrievemanifestfrom", 
 				type="string", metavar="vendorIP:port", default="",
 				help="Specifies the vendor to retrieve the manifest from (default None).")
+	
+	parser.add_option("","--printfilenames", dest="printfiles", 
+				action="store_true", default=False,
+				help="Print a list of all available files in the manifest file.")
 
 	parser.add_option("","--vendorip", dest="vendorip", type="string", metavar="IP", 
 				default=None, help="Vendor IP for overwriting the value from manifest.")
@@ -346,10 +351,10 @@ def parse_options():
 				help="Activates chunks and specifies redundancy (how often they overlap). (default None)")
 
 	parser.add_option("-R", "--rng", action="store_true", dest="rng", default=False,
-					help="Use seed expansion from RNG for latter chunks (default False). Requires -r")
+				help="Use seed expansion from RNG for latter chunks (default False). Requires -r")
 					
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
-					help="Query one block per chunk in parallel (default False). Requires -r")
+				help="Query one block per chunk in parallel (default False). Requires -r")
 
 	parser.add_option("","--numberofthreads", dest="numberofthreads",
 				type="int", default=None,
@@ -387,13 +392,12 @@ def parse_options():
 		print "Number of threads must be positive"
 		sys.exit(1)
 
-	if len(remainingargs) == 0:
+	if len(remainingargs) == 0 and _commandlineoptions.printfiles == False:
 		print "Must specify at least one file to retrieve!"
 		sys.exit(1)
 
 	#filename(s)
 	_commandlineoptions.filestoretrieve = remainingargs
-
 
 
 def main():
@@ -425,13 +429,12 @@ def main():
 	manifestfilelist = raidpirlib.get_filenames_in_release(manifestdict)
 
 	
-	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors*8) and _commandlineoptions.redundancy != None:
+	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors * 8) and _commandlineoptions.redundancy != None:
 		print "Block count too low to use chunks!"
 		sys.exit(1)
 
-
-	#print "Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:",   manifestfilelist
-
+	if _commandlineoptions.printfiles:
+		print "Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:\n", manifestfilelist
 
 
 	# ensure the requested files are in there...
@@ -440,10 +443,10 @@ def main():
 		if filename not in manifestfilelist:
 			print "File:", filename, "is not listed in the manifest."
 			sys.exit(2)
-		
-	request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
-
 	
+	# don't run PIR if we're just printing the filenames in the manifest
+	if len(_commandlineoptions.filestoretrieve) > 0:	
+		request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
 
 
 
