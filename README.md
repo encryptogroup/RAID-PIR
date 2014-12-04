@@ -103,12 +103,12 @@ Repeat this for the number of mirror servers you want to start. The minimum numb
 
 ### 3. Running an RAID-PIR client 
 
-Now you can go and retrieve files using `raidpir_client`. Open a terminal in the client directory. To retrieve the file '1.jpg', simply say where to retrieve the manifest from and then retrieve it.
+Now you can retrieve files using `raidpir_client.py`. Open a terminal in the client directory. First you need the manifest file, which tells you a list of available files and what blocks they map to. The manifest can be requested from the vendor with the same call as the file query.
+To retrieve the file `1.jpg`, simply say where to retrieve the manifest from and then the filename to retrieve it.
 
 Command: `python raidpir_client.py [--retrievemanifestfrom <IP:PORT>] <FILENAME> [<FILENAME2> ...]`
 
 Example:
-
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/client$ python raidpir_client.py --retrievemanifestfrom 127.0.0.1:62293 1.jpg
 RAID-PIR Client v0.9.0
@@ -119,7 +119,7 @@ wrote 1.jpg
 
 Once you've retrieved the manifest, you can download other files without re-retrieving the manifest (assuming the files and the manifest haven't changed).
 
-You can specify several optimizations for the client. To get a list of all options with short description run `python raidpir_client.py -h`. Please see our paper for a detailed explanation of how the optimizations work.
+You can specify several optimizations for the client. To get a list of all options with short description run `python raidpir_client.py -h`. Please see our paper for a detailed explanation of how these optimizations work.
 
 ### 4. Restarting the mirrors or vendor 
 
