@@ -180,11 +180,11 @@ class RandomXORRequestor:
 		for thisrequestinfo in self.activemirrorinfolist:
 			#send parameters to mirrors once
 			params = {}
-			params['cn'] = 1
+			params['cn'] = 1 # chunk numbers, here fixed to 1
 			params['k'] = privacythreshold
 			params['r'] = privacythreshold
-			params['cl'] = 1
-			params['lcl'] = 1
+			params['cl'] = 1 # chunk length, here fixed to 1
+			params['lcl'] = 1 # last chunk length, here fixed to 1
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port'], params)
 			
 

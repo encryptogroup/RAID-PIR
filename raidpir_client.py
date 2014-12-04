@@ -112,7 +112,7 @@ def _request_helper(rxgobj):
 	return
 
 def _request_helper_chunked(rxgobj):
-	# Private helper to get requests.   Multiple threads will execute this...
+	# Private helper to get requests. Potentially multiple threads will execute this...
 	thisrequest = rxgobj.get_next_xorrequest()
 	
 	# go until there are no more requests
@@ -125,15 +125,15 @@ def _request_helper_chunked(rxgobj):
 		try:
 
 			# request the XOR block...
-			if rqtype == 1: #seed expansion
+			if rqtype == 1: # chunks and seed expansion
 				seed = thisrequest[4]
 				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(mirrorip, mirrorport, chunks, seed)
 
-			elif rqtype == 2: #seed expansion AND parallel
+			elif rqtype == 2: # chunks, seed expansion and parallel
 				seed = thisrequest[4]
 				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(mirrorip, mirrorport, chunks, seed)
 
-			else: #chunks
+			else: # only chunks (redundancy)
 				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked(mirrorip, mirrorport, chunks)
 
 		except Exception, e:
@@ -224,9 +224,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		_request_helper_chunked(rxgobj)
 
 
-
-
-	# okay, now we have them all...   Let's get the returned dict ready...
+	# okay, now we have them all. Let's get the returned dict ready.
 	retdict = {}
 	for blocknum in requestedblocklist:
 		retdict[blocknum] = rxgobj.return_block(blocknum)
@@ -336,7 +334,7 @@ def parse_options():
 				help="Print a list of all available files in the manifest file.")
 
 	parser.add_option("","--vendorip", dest="vendorip", type="string", metavar="IP", 
-				default=None, help="Vendor IP for overwriting the value from manifest.")
+				default=None, help="Vendor IP for overwriting the value from manifest; for testing purposes.")
 
 	parser.add_option("","--manifestfile", dest="manifestfilename", 
 				type="string", default="manifest.dat",
@@ -430,7 +428,7 @@ def main():
 
 	
 	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors * 8) and _commandlineoptions.redundancy != None:
-		print "Block count too low to use chunks!"
+		print "Block count too low to use chunks! Try reducing the block size or add more files to the database."
 		sys.exit(1)
 
 	if _commandlineoptions.printfiles:
@@ -441,7 +439,7 @@ def main():
 	for filename in _commandlineoptions.filestoretrieve:
 
 		if filename not in manifestfilelist:
-			print "File:", filename, "is not listed in the manifest."
+			print "The file", filename, "is not listed in the manifest."
 			sys.exit(2)
 	
 	# don't run PIR if we're just printing the filenames in the manifest
