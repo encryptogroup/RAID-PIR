@@ -290,7 +290,7 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 		to use parse_manifest to ensure this data is correct.
 	"""
 
-	response = _remote_query_helper_sock(socket, "XORBLOCK" + bitstring)
+	response = _remote_query_helper_sock(socket, "X" + bitstring)
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -299,7 +299,7 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
 
-	response = _remote_query_helper_sock(socket, "CHUNKS" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, "C" + msgpack.packb(chunks))
 
 	if response == 'Invalid request length':
 		raise ValueError(response)
@@ -312,7 +312,7 @@ def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed):
 
 	chunks['s'] = seed
 
-	response = _remote_query_helper_sock(socket, "RNG" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -324,7 +324,7 @@ def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed):
 
 	chunks['s'] = seed
 
-	response = _remote_query_helper_sock(socket, "MB" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -1081,7 +1081,7 @@ def nextrandombitsAES(bitlength):
 
 
 def send_params(socket, params):
-	response = _remote_query_helper_sock(socket, "PARAMS" + msgpack.packb(params))
+	response = _remote_query_helper_sock(socket, "P" + msgpack.packb(params))
 	if response != 'PARAMS OK':
 		raise ValueError(response)
 

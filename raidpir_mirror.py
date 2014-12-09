@@ -142,9 +142,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 			remoteip, remoteport = self.request.getpeername()
 	
 			# if it's a request for a XORBLOCK
-			if requeststring.startswith('XORBLOCK'):
+			if requeststring.startswith('X'):
 	
-				bitstring = requeststring[len('XORBLOCK'):]
+				bitstring = requeststring[len('X'):]
 		
 				expectedbitstringlength = raidpirlib.compute_bitstring_length(_global_myxordatastore.numberofblocks)
 	
@@ -166,9 +166,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				# done!
 				#return
 	
-			elif requeststring.startswith('CHUNKS'):
+			elif requeststring.startswith('C'):
 	
-				payload = requeststring[len('CHUNKS'):]
+				payload = requeststring[len('C'):]
 	
 				chunks = msgpack.unpackb(payload)
 	
@@ -185,9 +185,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#done!
 				#return
 	
-			elif requeststring.startswith('RNG'):
+			elif requeststring.startswith('R'):
 	
-				payload = requeststring[len('RNG'):]
+				payload = requeststring[len('R'):]
 	
 				chunks = msgpack.unpackb(payload)
 	
@@ -217,9 +217,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#done!
 				#return
 	
-			elif requeststring.startswith('MB'): 
+			elif requeststring.startswith('M'): 
 	
-				payload = requeststring[len('MB'):]
+				payload = requeststring[len('M'):]
 	
 				chunks = msgpack.unpackb(payload)
 	
@@ -252,9 +252,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#done!
 				#return
 	
-			elif requeststring.startswith('PARAMS'):
+			elif requeststring.startswith('P'):
 	
-				payload = requeststring[len('PARAMS'):]
+				payload = requeststring[len('P'):]
 	
 				params = msgpack.unpackb(payload)
 	
