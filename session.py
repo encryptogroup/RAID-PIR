@@ -60,11 +60,11 @@ def recvmessage(socketobj):
 		if chunk == '': 
 			raise SessionEOF, "Connection Closed"
 		data = data + chunk
-
+	
 	return data
 
 # a private helper function
-def _sendhelper(socketobj,data):
+def _sendhelper(socketobj, data):
 	sentlength = 0
 	# if I'm still missing some, continue to send (I could have used sendall
 	# instead but this isn't supported in reply currently)
@@ -75,8 +75,8 @@ def _sendhelper(socketobj,data):
 
 
 # send the message 
-def sendmessage(socketobj,data):
+def sendmessage(socketobj, data):
 	header = str(len(data)) + '\n'
-	_sendhelper(socketobj,header)
+	_sendhelper(socketobj, header)
 
-	_sendhelper(socketobj,data)
+	_sendhelper(socketobj, data)
