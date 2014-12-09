@@ -1,16 +1,16 @@
-RAID-PIR
-========
+# RAID-PIR
+
 
 RAID-PIR is an efficient implementation of [private information retrieval](https://en.wikipedia.org/wiki/Private_information_retrieval) with multiple servers.
 
-Details of the underlying protocols can be found in the paper "RAID-PIR: Practical Multi-Server PIR" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by: 
+Details of the underlying protocols can be found in the paper "[RAID-PIR: Practical Multi-Server PIR](http://encrypto.de/papers/DHS14.pdf)" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by: 
 * [Daniel Demmler](http://www.ec-spride.tu-darmstadt.de/en/research-groups/engineering-cryptographic-protocols-group/staff/daniel-demmler/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
 * [Amir Herzberg](https://sites.google.com/site/amirherzberg/), Bar Ilan University
 * [Thomas Schneider](http://www.thomaschneider.de/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
 
 This code is an extension of [upPIR](https://uppir.poly.edu) and large parts of it were written by the upPIR maintainers. A big thanks to [Justin Cappos](https://isis.poly.edu/~jcappos/) for making the original upPIR code publicly available.
 
-Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de)
+Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de) or create an issue here on github.
 
 **Warning:** This code is **not** meant to be used for a productive environment and is intended for testing and demonstration purposes only.
 
@@ -22,11 +22,13 @@ Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-
 * `gcc` (Version 4.x or newer should be fine)
 * some sort of somewhat recent Unix (We tested everything on Debian, but MacOS should be OK as well; Windows might work but was never tested...)
 
-### 1. Setting up RAID-PIR Instances
+## Setting up RAID-PIR Instances and Testing
 
-This document describes how to set up instances of an RAID-PIR vendor, mirrors, and client for testing.
+### 1. Preparations
 
-First, make sure you checked out the most recent version from github.
+The following steps describe how to set up instances of an RAID-PIR vendor, mirrors, and client for testing the code locally.
+
+Before you start, make sure you checked out the most recent version from github.
 
 #### 1.1 Fast XOR
 To have fast XOR operations, you'll need to build some C code. To do this you have to run `python setup.py build`.
@@ -43,7 +45,7 @@ You can also try to link the files to the different directories for easier editi
 
 Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files/`. Once the files to share are inside this directory you can create a manifest file.
 
-Command: `python raidpir_create_manifest.py <DIR> <BLOCKSIZE> <IP>`
+Command: `python raidpir_create_manifest.py <DIR> <BLOCKSIZE> <VENDOR-IP>`
 
 Example:
 
@@ -79,9 +81,9 @@ Vendor Server started at 127.0.0.1 : 62293
 In other terminals, you can run mirror instances as well.
 Change your terminal to the mirror's directory (such as `../mirror1`).
 
-Each mirror will need to know where to locate the mirror files, what ports to use, a copy of the manifest file,. 
+Each mirror will need to know where to locate the mirror files, what ports to use, and a copy of the manifest file. 
 
-Command: `python raidpir_mirror.py --ip <IP> --port <PORT> --foreground --mirrorroot <DIR> --retrievemanifestfrom <IP>`
+Command: `python raidpir_mirror.py --ip <MIRROR-IP> --port <MIRROR-PORT> --foreground --mirrorroot <DIR> --retrievemanifestfrom <VENDOR-IP>`
 
 Example:
 
@@ -91,7 +93,7 @@ RAID-PIR mirror v0.9.0
 Mirror Server started at 127.0.0.1 : 62001
 ```
 
-We can run another mirror instance in a different terminal. You will need to change the mirror to another directory and listen on different ports when you're on one single machine.
+We can run another mirror instance in a different terminal. You will need to change to another directory and listen on a different port when you're on a single machine.
 
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --foreground --mirrorroot ../files/ --retrievemanifestfrom 127.0.0.1
@@ -101,7 +103,7 @@ Mirror Server started at 127.0.0.1 : 62002
 
 Repeat this for the number of mirror servers you want to start. The minimum number of mirror servers required for RAID-PIR (and any other multi-server PIR schemes) is 2.
 
-### 3. Running an RAID-PIR client 
+### 3. Running a RAID-PIR client 
 
 Now you can retrieve files using `raidpir_client.py`. Open a terminal in the client directory. First you need the manifest file, which tells you a list of available files and what blocks they map to. The manifest can be requested from the vendor with the same call as the file query.
 To retrieve the file `1.jpg`, simply say where to retrieve the manifest from and then the filename to retrieve it.
@@ -119,9 +121,16 @@ wrote 1.jpg
 
 Once you've retrieved the manifest, you can download other files without re-retrieving the manifest (assuming the files and the manifest haven't changed).
 
-You can specify several optimizations for the client. To get a list of all options with short description run `python raidpir_client.py -h`. Please see our paper for a detailed explanation of how these optimizations work.
+#### 3.1 RAID-PIR Optimizations
 
-### 4. Restarting the mirrors or vendor 
+You can activate several optimizations for the client by specifying command line arguments.
+* `-r <number>` activates chunks and sets the redundancy parameter
+* `-R` activates randomness expansion from a seed
+* `-p` activates parallel multi-block queries
+
+Please see [our RAID-PIR paper](http://encrypto.de/papers/DHS14.pdf) for a detailed explanation of how these optimizations work.
+
+### 4. Restarting the Mirrors or Vendor 
 
 You can try to use CTRL-C or CTRL-Z on some OSes to end the RAID-PIR processes. On other OSes, this will raise an exception but will not exit. Also, check your process manager and see if you really terminated the processes. Sometimes this doesn't work due to the multi-threading in RAID-PIR.
 

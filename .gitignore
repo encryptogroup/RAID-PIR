@@ -2,3 +2,4 @@ README.html
 *.pyc
 *.dat
 *.sh
+*.sublime*
