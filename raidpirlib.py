@@ -262,7 +262,7 @@ def retrieve_rawmanifest(vendorlocation, defaultvendorport = 62293):
 	"""
 	return _remote_query_helper(vendorlocation, "GET MANIFEST", defaultvendorport)
 
-def retrieve_xorblock_from_mirror(mirrorip, mirrorport, bitstring):
+def retrieve_xorblock_from_mirror(socket, bitstring):
 
 	"""
 	<Purpose>
@@ -290,16 +290,16 @@ def retrieve_xorblock_from_mirror(mirrorip, mirrorport, bitstring):
 		to use parse_manifest to ensure this data is correct.
 	"""
 
-	response = _remote_query_helper(mirrorip, "XORBLOCK" + bitstring, mirrorport)
+	response = _remote_query_helper_sock(socket, "XORBLOCK" + bitstring)
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
 	return response
 
-def retrieve_xorblock_from_mirror_chunked(mirrorip, mirrorport, chunks):
+def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
 
-	response = _remote_query_helper(mirrorip, "CHUNKS" + msgpack.packb(chunks), mirrorport)
+	response = _remote_query_helper_sock(socket, "CHUNKS" + msgpack.packb(chunks))
 
 	if response == 'Invalid request length':
 		raise ValueError(response)
@@ -308,11 +308,11 @@ def retrieve_xorblock_from_mirror_chunked(mirrorip, mirrorport, chunks):
 
 	return response
 
-def retrieve_xorblock_from_mirror_chunked_rng(mirrorip, mirrorport, chunks, seed):
+def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed):
 
 	chunks['s'] = seed
 
-	response = _remote_query_helper(mirrorip, "RNG" + msgpack.packb(chunks), mirrorport)
+	response = _remote_query_helper_sock(socket, "RNG" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -320,11 +320,11 @@ def retrieve_xorblock_from_mirror_chunked_rng(mirrorip, mirrorport, chunks, seed
 
 	return response
 
-def retrieve_xorblock_from_mirror_chunked_rng_parallel(mirrorip, mirrorport, chunks, seed):
+def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed):
 
 	chunks['s'] = seed
 
-	response = _remote_query_helper(mirrorip, "MB" + msgpack.packb(chunks), mirrorport)
+	response = _remote_query_helper_sock(socket, "MB" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -377,7 +377,16 @@ def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
 	return mirrorinfolist
 
 
+# when a socket is already opened
+def _remote_query_helper_sock(socket, command):
+	# issue the relevant command
+	session.sendmessage(socket, command)
 
+	# receive and return the answer
+	rawanswer = session.recvmessage(socket)
+	return rawanswer
+
+# opens a new socket each time...
 def _remote_query_helper(serverlocation, command, defaultserverport):
 	# private function that contains the guts of server communication.   It
 	# issues a single query and then closes the connection.   This is used
@@ -1071,10 +1080,9 @@ def nextrandombitsAES(bitlength):
 		return cipher.encrypt(pt)
 
 
-def send_params(mirrorip, mirrorport, params):
-
-	response = _remote_query_helper(mirrorip, "PARAMS" + msgpack.packb(params), mirrorport)
+def send_params(socket, params):
+	response = _remote_query_helper_sock(socket, "PARAMS" + msgpack.packb(params))
 	if response != 'PARAMS OK':
-		raise "Error sending parameters!:" + ValueError(response)
+		raise ValueError(response)
 
 	return response

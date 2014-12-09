@@ -24,6 +24,10 @@ import time
 
 import sys
 
+import socket
+
+import session
+
 try:
 	#for packing more complicated messages
 	import msgpack
@@ -160,8 +164,7 @@ class RandomXORRequestor:
 		if len(mirrorinfolist) < self.privacythreshold:
 			raise InsufficientMirrors("Requested the use of "+str(self.privacythreshold)+" mirrors, but only "+str(len(mirrorinfolist))+" were available.")
 
-		# now we do the 'random' part.   I copy the mirrorinfolist to avoid changing
-		# the list in place.
+		# now we do the 'random' part.   I copy the mirrorinfolist to avoid changing the list in place.
 		self.fullmirrorinfolist = mirrorinfolist[:]
 		random.shuffle(self.fullmirrorinfolist)
 
@@ -174,7 +177,11 @@ class RandomXORRequestor:
 			thisrequestinfo['servingrequest'] = False
 			thisrequestinfo['blocksneeded'] = blocklist[:]
 			thisrequestinfo['blockbitstringlist'] = []
-	
+			
+			#open a socket once:
+			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
+			
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -185,7 +192,7 @@ class RandomXORRequestor:
 			params['r'] = privacythreshold
 			params['cl'] = 1 # chunk length, here fixed to 1
 			params['lcl'] = 1 # last chunk length, here fixed to 1
-			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port'], params)
+			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 			
 
 		bitstringlength = raidpirlib.compute_bitstring_length(manifestdict['blockcount'])
@@ -228,6 +235,13 @@ class RandomXORRequestor:
 
 		# and we're ready!
 
+
+	def cleanup(self):
+		# close sockets
+		for thisrequestinfo in self.activemirrorinfolist:
+			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "Q")
+			thisrequestinfo['mirrorinfo']['socket'].close()
+			
 
 	def get_next_xorrequest(self):
 		"""
@@ -502,10 +516,14 @@ class RandomXORRequestorChunks:
 
 			# chunk numbers [0, ..., r-1]
 			thisrequestinfo['chunknumbers'] = [i]
-			for j in range(1, redundancy):
+			for j in xrange(1, redundancy):
 				thisrequestinfo['chunknumbers'].append((i+j) % privacythreshold)
 			i = i + 1
-
+			
+			#open a socket once:
+			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
+			
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -516,7 +534,7 @@ class RandomXORRequestorChunks:
 			params['r'] = redundancy
 			params['cl'] = self.chunklen
 			params['lcl'] = self.lastchunklen
-			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port'], params)
+			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 
 		
 		#multi block query. map the blocks to the minimum amount of queries
@@ -693,6 +711,11 @@ class RandomXORRequestorChunks:
 		# preparation done. queries are ready to be sent.
 
 
+	def cleanup(self):
+		# close sockets
+		for thisrequestinfo in self.activemirrorinfolist:
+			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "Q")
+			thisrequestinfo['mirrorinfo']['socket'].close()
 
 	# chunked version:
 	def get_next_xorrequest(self):
@@ -865,8 +888,8 @@ class RandomXORRequestorChunks:
 
 						activemirrorinfo['blockchunklist'].pop(0) 
 
-						#if self.rng:
-						#	seed = activemirrorinfo['seedlist'].pop(0) 
+						if self.rng:
+							seed = activemirrorinfo['seedlist'].pop(0) 
 						#assert(blocknumber == xorrequesttuple[1]) #TODO modify this checks for parallel query [this one contains the blocknumbers]
 						#assert(bitstring == xorrequesttuple[2])
 		
@@ -915,9 +938,9 @@ class RandomXORRequestorChunks:
 					# remove the block and bitstring (asserting they match what we said before)
 						blocknumber = activemirrorinfo['blocksneeded'].pop(0)
 
-						#bitstring = activemirrorinfo['blockchunklist'].pop(0) 
-						#if self.rng:
-					#		seed = activemirrorinfo['seedlist'].pop(0) 
+						bitstring = activemirrorinfo['blockchunklist'].pop(0) 
+						if self.rng:
+							seed = activemirrorinfo['seedlist'].pop(0) 
 						assert(blocknumber == xorrequesttuple[1])
 						#assert(bitstring == xorrequesttuple[2])
 		

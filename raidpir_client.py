@@ -82,13 +82,12 @@ def _request_helper(rxgobj):
 	
 	# go until there are no more requests
 	while thisrequest != ():
-		mirrorip = thisrequest[0]['ip']
-		mirrorport = thisrequest[0]['port']
+		socket = thisrequest[0]['socket']
 		bitstring = thisrequest[2]
 		try:
 			# request the XOR block...
 			# TODO make this asynchronous
-			xorblock = raidpirlib.retrieve_xorblock_from_mirror(mirrorip, mirrorport, bitstring)
+			xorblock = raidpirlib.retrieve_xorblock_from_mirror(socket, bitstring)
 
 		except Exception, e:
 			if 'socked' in str(e):
@@ -107,7 +106,7 @@ def _request_helper(rxgobj):
 		
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest()
-
+	
 	# and that's it!
 	return
 
@@ -117,8 +116,7 @@ def _request_helper_chunked(rxgobj):
 	
 	# go until there are no more requests
 	while thisrequest != ():
-		mirrorip = thisrequest[0]['ip']
-		mirrorport = thisrequest[0]['port']
+		socket = thisrequest[0]['socket']
 		chunks = thisrequest[2]
 		rqtype = thisrequest[3]
 
@@ -127,14 +125,14 @@ def _request_helper_chunked(rxgobj):
 			# request the XOR block...
 			if rqtype == 1: # chunks and seed expansion
 				seed = thisrequest[4]
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(mirrorip, mirrorport, chunks, seed)
+				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed)
 
 			elif rqtype == 2: # chunks, seed expansion and parallel
 				seed = thisrequest[4]
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(mirrorip, mirrorport, chunks, seed)
+				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed)
 
 			else: # only chunks (redundancy)
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked(mirrorip, mirrorport, chunks)
+				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked(socket, chunks)
 
 		except Exception, e:
 			if 'socked' in str(e):
@@ -202,6 +200,8 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper, args=[rxgobj]).start()
 
 		_request_helper(rxgobj)
+		
+		rxgobj.cleanup()
 	
 	else: # chunks
 
@@ -222,6 +222,8 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper_chunked, args=[rxgobj]).start()
 
 		_request_helper_chunked(rxgobj)
+		
+		rxgobj.cleanup()
 
 
 	# okay, now we have them all. Let's get the returned dict ready.

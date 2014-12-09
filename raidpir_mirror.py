@@ -131,159 +131,171 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		global r
 		global chunklen
 		global lastchunklen
+		
+		requeststring = '0'
 
-		# read the request from the socket...
-		requeststring = session.recvmessage(self.request)
-
-		# for logging purposes, get the remote info
-		remoteip, remoteport = self.request.getpeername()
-
-		# if it's a request for a XORBLOCK
-		if requeststring.startswith('XORBLOCK'):
-
-			bitstring = requeststring[len('XORBLOCK'):]
+		while(requeststring!='Q'):
+			# read the request from the socket...
+			requeststring = session.recvmessage(self.request)
 	
-			expectedbitstringlength = raidpirlib.compute_bitstring_length(_global_myxordatastore.numberofblocks)
-
-			if len(bitstring) != expectedbitstringlength:
-				# Invalid request length...
-				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request with length: "+str(len(bitstring)))
-
-				session.sendmessage(self.request, 'Invalid request length')
+			# for logging purposes, get the remote info
+			remoteip, remoteport = self.request.getpeername()
+	
+			# if it's a request for a XORBLOCK
+			if requeststring.startswith('XORBLOCK'):
+	
+				bitstring = requeststring[len('XORBLOCK'):]
+		
+				expectedbitstringlength = raidpirlib.compute_bitstring_length(_global_myxordatastore.numberofblocks)
+	
+				if len(bitstring) != expectedbitstringlength:
+					# Invalid request length...
+					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request with length: "+str(len(bitstring)))
+	
+					session.sendmessage(self.request, 'Invalid request length')
+					return
+		
+				# Now let's process this...
+				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+	
+				# and send the reply.
+				session.sendmessage(self.request, xoranswer)
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+	
+	
+				# done!
+				#return
+	
+			elif requeststring.startswith('CHUNKS'):
+	
+				payload = requeststring[len('CHUNKS'):]
+	
+				chunks = msgpack.unpackb(payload)
+	
+				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) 
+	
+				# Now let's process this...
+				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+	
+				# and send the reply.
+				session.sendmessage(self.request, xoranswer)
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+	
+	
+				#done!
+				#return
+	
+			elif requeststring.startswith('RNG'):
+	
+				payload = requeststring[len('RNG'):]
+	
+				chunks = msgpack.unpackb(payload)
+	
+				raidpirlib.initAES(chunks['s'])
+				del chunks['s']
+	
+				#iterate through r-1 random chunks
+				for c in chunknumbers[1:]:
+					
+					if c == k - 1:
+						length = lastchunklen
+					else:
+						length = chunklen
+	
+					chunks[c] = raidpirlib.nextrandombitsAES(length)
+	
+	
+				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
+	
+				# Now let's process this...
+				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+	
+				# and send the reply.
+				session.sendmessage(self.request, xoranswer)
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+	
+				#done!
+				#return
+	
+			elif requeststring.startswith('MB'): 
+	
+				payload = requeststring[len('MB'):]
+	
+				chunks = msgpack.unpackb(payload)
+	
+				raidpirlib.initAES(chunks['s'])
+				
+				del chunks['s']
+	
+				#iterate through r-1 random chunks
+				for c in chunknumbers[1:]:
+					
+					if c == k - 1:
+						length = lastchunklen
+					else:
+						length = chunklen
+	
+					chunks[c] = raidpirlib.nextrandombitsAES(length)
+	
+	
+				bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
+	
+				result = {}
+				for c in chunknumbers:
+					result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
+	
+				# and send the reply.
+				session.sendmessage(self.request, msgpack.packb(result))
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+	
+	
+				#done!
+				#return
+	
+			elif requeststring.startswith('PARAMS'):
+	
+				payload = requeststring[len('PARAMS'):]
+	
+				params = msgpack.unpackb(payload)
+	
+				chunknumbers = params['cn']
+				k  = params['k']
+				r = params['r']
+				chunklen = params['cl']
+				lastchunklen = params['lcl']
+	
+				# and send the reply.
+				session.sendmessage(self.request, "PARAMS OK")
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
+	
+			
+	
+				#done!
+				#return
+	
+			elif requeststring == 'HELLO':
+				# send a reply.
+				session.sendmessage(self.request, "HI!")
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
+	
+				# done!
+				#return
+			
+			#the client asked to close the connection
+			elif requeststring == 'Q':
+				return
+			
+			#this happens if the client closed the socket unexpectedly	
+			elif requeststring =='':
 				return
 	
-			# Now let's process this...
-			xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-
-			# and send the reply.
-			session.sendmessage(self.request, xoranswer)
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-
-
-			# done!
-			return
-
-		elif requeststring.startswith('CHUNKS'):
-
-			payload = requeststring[len('CHUNKS'):]
-
-			chunks = msgpack.unpackb(payload)
-
-			bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) 
-
-			# Now let's process this...
-			xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-
-			# and send the reply.
-			session.sendmessage(self.request, xoranswer)
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-
-
-			#done!
-			return
-
-		elif requeststring.startswith('RNG'):
-
-			payload = requeststring[len('RNG'):]
-
-			chunks = msgpack.unpackb(payload)
-
-			raidpirlib.initAES(chunks['s'])
-			del chunks['s']
-
-			#iterate through r-1 random chunks
-			for c in chunknumbers[1:]:
+			else:
+				# we don't know what this is!   Log and tell the requestor
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request type starts:'"+requeststring[:5]+"'")
+	
+				session.sendmessage(self.request, 'Invalid request type')
 				
-				if c == k - 1:
-					length = lastchunklen
-				else:
-					length = chunklen
-
-				chunks[c] = raidpirlib.nextrandombitsAES(length)
-
-
-			bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
-
-			# Now let's process this...
-			xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-
-			# and send the reply.
-			session.sendmessage(self.request, xoranswer)
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-
-			#done!
-			return
-
-		elif requeststring.startswith('MB'): 
-
-			payload = requeststring[len('MB'):]
-
-			chunks = msgpack.unpackb(payload)
-
-			raidpirlib.initAES(chunks['s'])
-			
-			del chunks['s']
-
-			#iterate through r-1 random chunks
-			for c in chunknumbers[1:]:
-				
-				if c == k - 1:
-					length = lastchunklen
-				else:
-					length = chunklen
-
-				chunks[c] = raidpirlib.nextrandombitsAES(length)
-
-
-			bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
-
-			result = {}
-			for c in chunknumbers:
-				result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
-
-			# and send the reply.
-			session.sendmessage(self.request, msgpack.packb(result))
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-
-
-			#done!
-			return
-
-		elif requeststring.startswith('PARAMS'):
-
-			payload = requeststring[len('PARAMS'):]
-
-			params = msgpack.unpackb(payload)
-
-			chunknumbers = params['cn']
-			k  = params['k']
-			r = params['r']
-			chunklen = params['cl']
-			lastchunklen = params['lcl']
-
-			# and send the reply.
-			session.sendmessage(self.request, "PARAMS OK")
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
-
-		
-
-			#done!
-			return
-
-		elif requeststring == 'HELLO':
-			# send a reply.
-			session.sendmessage(self.request, "HI!")
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
-
-			# done!
-			return
-
-		else:
-			# we don't know what this is!   Log and tell the requestor
-			#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request type starts:'"+requeststring[:5]+"'")
-
-			session.sendmessage(self.request, 'Invalid request type')
-			return
+				return
 
 
 
