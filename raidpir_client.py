@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	October 2014
+	December 2014
 
 <Description>
 	Client code for retrieving RAID-PIR files. This program uses a manifest
@@ -124,12 +124,10 @@ def _request_helper_chunked(rxgobj):
 
 			# request the XOR block...
 			if rqtype == 1: # chunks and seed expansion
-				seed = thisrequest[4]
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed)
+				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(socket, chunks)
 
 			elif rqtype == 2: # chunks, seed expansion and parallel
-				seed = thisrequest[4]
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed)
+				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks)
 
 			else: # only chunks (redundancy)
 				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked(socket, chunks)

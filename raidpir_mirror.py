@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	July 2014
+	December 2014
 
 <Description>
 	Mirror code that serves RAID-PIR files.   A client obtains a list of live 
@@ -36,8 +36,6 @@
 # module).   These could include memoization and other optimizations to 
 # further improve the speed of XOR processing.
 #
-
-
 
 
 import sys
@@ -131,6 +129,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		global r
 		global chunklen
 		global lastchunklen
+		global cipher
 		
 		requeststring = '0'
 
@@ -191,8 +190,6 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 	
 				chunks = msgpack.unpackb(payload)
 	
-				raidpirlib.initAES(chunks['s'])
-				del chunks['s']
 	
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
@@ -202,7 +199,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					else:
 						length = chunklen
 	
-					chunks[c] = raidpirlib.nextrandombitsAES(length)
+					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
 	
 	
 				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
@@ -222,11 +219,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				payload = requeststring[len('M'):]
 	
 				chunks = msgpack.unpackb(payload)
-	
-				raidpirlib.initAES(chunks['s'])
-				
-				del chunks['s']
-	
+		
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
 					
@@ -235,7 +228,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					else:
 						length = chunklen
 	
-					chunks[c] = raidpirlib.nextrandombitsAES(length)
+					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
 	
 	
 				bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
@@ -263,12 +256,13 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				r = params['r']
 				chunklen = params['cl']
 				lastchunklen = params['lcl']
+				
+				if 's' in params:
+					cipher = raidpirlib.initAES(params['s'])
 	
 				# and send the reply.
 				session.sendmessage(self.request, "PARAMS OK")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
-	
-			
 	
 				#done!
 				#return
@@ -300,7 +294,6 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 
 
-
 def service_raidpir_clients(myxordatastore, ip, port):
 
 	# this should be done before we are called
@@ -310,8 +303,7 @@ def service_raidpir_clients(myxordatastore, ip, port):
 	xorserver = ThreadedXORServer((ip, port), ThreadedXORRequestHandler)
 	
 
-	# and serve forever!   This call will not return which is why we spawn a new
-	# thread to handle it
+	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server").start()
 
 
@@ -338,7 +330,7 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		for fileinfo in _global_manifestdict['fileinfolist']:
 			# great, let's serve it!
 			if requestedfilename == fileinfo['filename']:
-				# it's a good query!   Send 200!
+				# it's a good query!  Send 200!
 				self.send_response(200)
 				self.end_headers()
 
@@ -442,11 +434,11 @@ def parse_options():
 
 
 	# check the arguments
-	if _commandlineoptions.port <=0 or _commandlineoptions.port >65535:
+	if _commandlineoptions.port <= 0 or _commandlineoptions.port > 65535:
 		print "Specified port number out of range"
 		sys.exit(1)
 
-	if _commandlineoptions.httpport <=0 or _commandlineoptions.httpport >65535:
+	if _commandlineoptions.httpport <= 0 or _commandlineoptions.httpport > 65535:
 		print "Specified HTTP port number out of range"
 		sys.exit(1)
 

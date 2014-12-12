@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	October 2014
+	December 2014
 
 <Description>
 	Vendor code for RAID-PIR. The vendor serves the manifest and mirror list.

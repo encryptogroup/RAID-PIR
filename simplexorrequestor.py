@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	October 2014
+	December 2014
 
 """
 
@@ -181,7 +181,7 @@ class RandomXORRequestor:
 			#open a socket once:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
-			
+						
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -510,9 +510,6 @@ class RandomXORRequestorChunks:
 
 			thisrequestinfo['blockchunklist'] = []
 			
-			
-			if rng:
-				thisrequestinfo['seedlist'] = []
 
 			# chunk numbers [0, ..., r-1]
 			thisrequestinfo['chunknumbers'] = [i]
@@ -524,6 +521,13 @@ class RandomXORRequestorChunks:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
 			
+			if rng:
+				#pick a random seed (key) and initialize AES
+				seed = _randomnumberfunction(16)
+				thisrequestinfo['seed'] = seed
+				thisrequestinfo['cipher'] = raidpirlib.initAES(seed)
+			
+			
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -534,6 +538,8 @@ class RandomXORRequestorChunks:
 			params['r'] = redundancy
 			params['cl'] = self.chunklen
 			params['lcl'] = self.lastchunklen
+			if rng:
+				params['s'] = thisrequestinfo['seed']
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 
 		
@@ -561,12 +567,6 @@ class RandomXORRequestorChunks:
 				#iterate through mirrors
 				for thisrequestinfo in self.activemirrorinfolist:
 
-					if rng:
-						#pick a random seed (key) and initialize AES
-						seed = _randomnumberfunction(16)
-						thisrequestinfo['seedlist'].append(seed)
-						raidpirlib.initAES(seed)
-
 					#dicitonary of chunk requests										
 					chunks = {}
 
@@ -581,7 +581,7 @@ class RandomXORRequestorChunks:
 
 						if rng:
 							#set random bytes for the latter chunk(s) from AES (will be deleted later)
-							chunks[c] = raidpirlib.nextrandombitsAES(length)
+							chunks[c] = raidpirlib.nextrandombitsAES(thisrequestinfo['cipher'], length)
 
 						else:
 							#set random bytes for the latter chunk(s) randomly
@@ -634,11 +634,6 @@ class RandomXORRequestorChunks:
 
 				#iterate through mirrors
 				for thisrequestinfo in self.activemirrorinfolist:
-
-					if rng:
-						seed = _randomnumberfunction(16)
-						thisrequestinfo['seedlist'].append(seed)
-						raidpirlib.initAES(seed)
 										
 					chunks = {}
 
@@ -652,7 +647,7 @@ class RandomXORRequestorChunks:
 							length = self.chunklen
 
 						if rng:
-							chunks[c] = raidpirlib.nextrandombitsAES(length)
+							chunks[c] = raidpirlib.nextrandombitsAES(thisrequestinfo['cipher'], length)
 
 						else:
 							#set random bytes for the latter chunk(s)
@@ -769,7 +764,7 @@ class RandomXORRequestorChunks:
 						requestinfo['servingrequest'] = True
 
 						if self.rng:
-							return (requestinfo['mirrorinfo'], requestinfo['parallelblocksneeded'][0], requestinfo['blockchunklist'][0], 2, requestinfo['seedlist'][0])
+							return (requestinfo['mirrorinfo'], requestinfo['parallelblocksneeded'][0], requestinfo['blockchunklist'][0], 2)
 						else:
 							raise Exception("Parallel Query without RNG not yet implemented!") #TODO
 
@@ -783,7 +778,7 @@ class RandomXORRequestorChunks:
 						requestinfo['servingrequest'] = True
 
 						if self.rng:
-							return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockchunklist'][0], 1, requestinfo['seedlist'][0])
+							return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockchunklist'][0], 1)
 						else:
 							return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockchunklist'][0], 0)
 
@@ -888,8 +883,6 @@ class RandomXORRequestorChunks:
 
 						activemirrorinfo['blockchunklist'].pop(0) 
 
-						if self.rng:
-							seed = activemirrorinfo['seedlist'].pop(0) 
 						#assert(blocknumber == xorrequesttuple[1]) #TODO modify this checks for parallel query [this one contains the blocknumbers]
 						#assert(bitstring == xorrequesttuple[2])
 		
@@ -939,8 +932,7 @@ class RandomXORRequestorChunks:
 						blocknumber = activemirrorinfo['blocksneeded'].pop(0)
 
 						bitstring = activemirrorinfo['blockchunklist'].pop(0) 
-						if self.rng:
-							seed = activemirrorinfo['seedlist'].pop(0) 
+
 						assert(blocknumber == xorrequesttuple[1])
 						#assert(bitstring == xorrequesttuple[2])
 		

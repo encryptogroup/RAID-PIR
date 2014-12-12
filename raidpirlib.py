@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	October 2014
+	December 2014
 
 <Description>
 	Lots of helper code for RAID-PIR. Much of this code will be used multiple 
@@ -53,7 +53,6 @@ class FileNotFound(Exception):
 
 class IncorrectFileContents(Exception):
 	"""The contents of the file do not match the manifest"""
-
 
 
 # these keys must exist in a manifest dictionary.
@@ -132,7 +131,6 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 	print "All blocks done."
 	return currenthashlist
 		
-
 
 
 def _validate_manifest(manifest):
@@ -298,7 +296,6 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 
 def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
-
 	response = _remote_query_helper_sock(socket, "C" + msgpack.packb(chunks))
 
 	if response == 'Invalid request length':
@@ -308,9 +305,7 @@ def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
 	return response
 
-def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed):
-
-	chunks['s'] = seed
+def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 
 	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
@@ -320,9 +315,7 @@ def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks, seed):
 
 	return response
 
-def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed):
-
-	chunks['s'] = seed
+def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 
 	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
@@ -334,7 +327,7 @@ def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks, seed):
 
 
 
-def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
+def retrieve_mirrorinfolist(vendorlocation, defaultvendorport = 62293):
 	"""
 	<Purpose>
 		Retrieves the mirrorinfolist from a vendor.  
@@ -1038,14 +1031,18 @@ def initAES(seed):
 
 	<Arguments>
 		seed: the aes key
+		
+	<Returns>
+		an initialized cipher object
 	"""
+	
 	ctr = Counter.new(128)
-	global cipher 
-	cipher = AES.new(seed, AES.MODE_CTR, counter=ctr)
+	return AES.new(seed, AES.MODE_CTR, counter=ctr)
+	
 
 
 
-def nextrandombitsAES(bitlength):
+def nextrandombitsAES(cipher, bitlength):
 	"""
 	<Purpose>
 		generate random bits using AES-CTR
@@ -1078,6 +1075,7 @@ def nextrandombitsAES(bitlength):
 	else:
 		pt = bytelength * "\0"
 		return cipher.encrypt(pt)
+
 
 
 def send_params(socket, params):
