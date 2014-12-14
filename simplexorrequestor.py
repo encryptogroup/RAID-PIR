@@ -46,14 +46,22 @@ import random
 
 ########################### XORRequestGenerator ###############################
 
+# receive thread
+def rcvlet(requestinfo, rxgobj):
+	sock = requestinfo['mirrorinfo']['socket']
+	data = "0"
+	while data!='' and (len(requestinfo['blocksrequested']) + len(requestinfo['blocksneeded']) )>0:
+		data = session.recvmessage(sock)
+		rxgobj.notify_success(requestinfo['mirrorinfo'], data)		
+
 
 def _reconstruct_block(blockinfolist):
 	# private helper to reconstruct a block
 		
 	# xor the blocks together
-	currentresult = blockinfolist[0]['xorblock']
-	for xorblockdict in blockinfolist[1:]:
-		currentresult = simplexordatastore.do_xor_blocks(currentresult, xorblockdict['xorblock'])
+	currentresult = blockinfolist[0]
+	for xorblock in blockinfolist[1:]:
+		currentresult = simplexordatastore.do_xor_blocks(currentresult, xorblock)
 
 	# and return the answer
 	return currentresult
@@ -160,7 +168,7 @@ class RandomXORRequestor:
 		self.manifestdict = manifestdict
 		self.privacythreshold = privacythreshold
 		self.pollinginterval = pollinginterval
-
+		
 		if len(mirrorinfolist) < self.privacythreshold:
 			raise InsufficientMirrors("Requested the use of "+str(self.privacythreshold)+" mirrors, but only "+str(len(mirrorinfolist))+" were available.")
 
@@ -177,8 +185,9 @@ class RandomXORRequestor:
 			thisrequestinfo['servingrequest'] = False
 			thisrequestinfo['blocksneeded'] = blocklist[:]
 			thisrequestinfo['blockbitstringlist'] = []
+			thisrequestinfo['blocksrequested'] = []
 			
-			#open a socket once:
+			# open a socket once:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
 						
@@ -194,30 +203,34 @@ class RandomXORRequestor:
 			params['lcl'] = 1 # last chunk length, here fixed to 1
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 			
+			# start separate receiving thread for this socket
+			t = threading.Thread(target=rcvlet, args = [thisrequestinfo, self], name = ("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			thisrequestinfo['rt'] = t
+			t.start()
+			
 
 		bitstringlength = raidpirlib.compute_bitstring_length(manifestdict['blockcount'])
 
-		# let's generate the bitstrings
+		# let's generate the random bitstrings for k-1 mirrors
 		for thisrequestinfo in self.activemirrorinfolist[:-1]:
 
 			for _ in blocklist:
 				thisrequestinfo['blockbitstringlist'].append(raidpirlib.randombits(manifestdict['blockcount']))
 
 		# now, let's do the 'derived' ones...
-		for blocknum in range(len(blocklist)):
+		for blocknum in xrange(len(blocklist)):
 			thisbitstring = '\0'*bitstringlength
 			
 			# xor the random strings together
 			for requestinfo in self.activemirrorinfolist[:-1]:
 				thisbitstring = simplexordatastore.do_xor(thisbitstring, requestinfo['blockbitstringlist'][blocknum])
 	
-			# ...and flip the appropriate bit for the block we want
+			# flip the appropriate bit for the block we want
 			thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocklist[blocknum])
+			
+			# store the result for the last mirror
 			self.activemirrorinfolist[-1]['blockbitstringlist'].append(thisbitstring)
 		
-		# we're done setting up the bitstrings!
-
-
 		# want to have a structure for locking
 		self.tablelock = threading.Lock()
 
@@ -277,13 +290,13 @@ class RandomXORRequestor:
 
 			# but always release it
 			try:
-				stillserving = False
+
 				for requestinfo in self.activemirrorinfolist:
 	
 					# if this mirror is serving a request, skip it...
-					if requestinfo['servingrequest']:
-						stillserving = True
-						continue
+# 					if requestinfo['servingrequest']:
+# 						stillserving = True
+# 						continue
 				
 					# this mirror is done...
 					if len(requestinfo['blocksneeded']) == 0:
@@ -291,10 +304,13 @@ class RandomXORRequestor:
 			
 					# otherwise set it to be taken...
 					requestinfo['servingrequest'] = True
-					return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockbitstringlist'][0])
-
-				if not stillserving:
-					return ()
+					blocknum = requestinfo['blocksneeded'].pop(0)
+					requestinfo['blocksrequested'].append(blocknum)
+					
+					return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop(0))
+				
+				#no blocks left to request
+				return ()
 
 			finally:
 				# I always want someone else to be able to get the lock
@@ -353,7 +369,7 @@ class RandomXORRequestor:
 
 
 
-	def notify_success(self, xorrequesttuple, xorblock):
+	def notify_success(self, thismirrorsinfo, xorblock):
 		"""
 		<Purpose>
 			Handles the receipt of an xorblock
@@ -376,28 +392,17 @@ class RandomXORRequestor:
 		self.tablelock.acquire()
 		#... but always release it
 		try:
-			thismirrorsinfo = xorrequesttuple[0]
 		
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
 				
-					# let's mark it as inactive and pop off the blocks, etc.
-					activemirrorinfo['servingrequest'] = False
 					
-					# remove the block and bitstring (asserting they match what we said 
-					# before)
-					blocknumber = activemirrorinfo['blocksneeded'].pop(0)
-					bitstring = activemirrorinfo['blockbitstringlist'].pop(0)
-					assert(blocknumber == xorrequesttuple[1])
-					assert(bitstring == xorrequesttuple[2])
-	
+					# remove the block and bitstring (asserting they match what we said before)
+					blocknumber = activemirrorinfo['blocksrequested'].pop(0) 
+
 					# add the xorblockinfo to the dict
-					xorblockdict = {}
-					xorblockdict['bitstring'] = bitstring
-					xorblockdict['mirrorinfo'] = thismirrorsinfo
-					xorblockdict['xorblock'] = xorblock
-					self.returnedxorblocksdict[blocknumber].append(xorblockdict)
+					self.returnedxorblocksdict[blocknumber].append(xorblock)
 
 					# if we don't have all of the pieces, continue
 					if len(self.returnedxorblocksdict[blocknumber]) != self.privacythreshold:

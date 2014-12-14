@@ -83,11 +83,11 @@ def _request_helper(rxgobj):
 	# go until there are no more requests
 	while thisrequest != ():
 		socket = thisrequest[0]['socket']
+		print socket
 		bitstring = thisrequest[2]
 		try:
 			# request the XOR block...
-			# TODO make this asynchronous
-			xorblock = raidpirlib.retrieve_xorblock_from_mirror(socket, bitstring)
+			raidpirlib.request_xorblock_from_mirror(socket, bitstring)
 
 		except Exception, e:
 			if 'socked' in str(e):
@@ -98,15 +98,17 @@ def _request_helper(rxgobj):
 				# otherwise, re-raise...
 				raise  
 
-		else:
+		#else:
 			# we retrieved it successfully...
-			rxgobj.notify_success(thisrequest, xorblock)
+			#rxgobj.notify_success(thisrequest, xorblock)
 			#sys.stdout.write('.')
 			#sys.stdout.flush()
 		
+
+		
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest()
-	
+
 	# and that's it!
 	return
 
@@ -198,6 +200,10 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper, args=[rxgobj]).start()
 
 		_request_helper(rxgobj)
+		
+		# wait for receiving threads to finish
+		for m in rxgobj.activemirrorinfolist:
+			m['rt'].join()
 		
 		rxgobj.cleanup()
 	
@@ -385,6 +391,8 @@ def parse_options():
 
 	if _commandlineoptions.numberofthreads == None:
 		_commandlineoptions.numberofthreads = _commandlineoptions.numberofmirrors
+		
+		_commandlineoptions.numberofmirrors = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
 
 	if _commandlineoptions.numberofthreads < 1:
 		print "Number of threads must be positive"

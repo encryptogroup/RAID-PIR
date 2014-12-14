@@ -156,7 +156,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-	
+		
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")

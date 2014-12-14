@@ -289,6 +289,11 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 		raise ValueError(response)
 
 	return response
+	
+# only request a xorblock, without receiving it
+def request_xorblock_from_mirror(socket, bitstring):
+	session.sendmessage(socket, "X" + bitstring)
+	
 
 def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
@@ -301,6 +306,7 @@ def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
 	return response
 
+
 def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 
 	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
@@ -311,6 +317,7 @@ def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 
 	return response
 
+
 def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 
 	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
@@ -320,7 +327,6 @@ def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 	# print "CHUNKED RNG PAR Query", len(msgpack.packb(chunks)), "|", len(response)
 
 	return response
-
 
 
 def retrieve_mirrorinfolist(vendorlocation, defaultvendorport = 62293):
