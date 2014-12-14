@@ -267,12 +267,9 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 		Retrieves a block from a mirror.   
 
 	<Arguments>
-		mirrorip: the mirror's IP address or hostname
+		socket: an open socket to the mirror
 
-		mirrorport: the mirror's port number
-
-		bitstring: a bit string that contains an appropriately sized request that
-							 specifies which blocks to combine.
+		bitstring: a bit string that contains an appropriately sized request that specifies which blocks to combine.
 
 	<Exceptions>
 		TypeError if the arguments are the wrong types.  ValueError if the 
@@ -284,8 +281,7 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 		Contacts the mirror and retrieves data from it
 
 	<Returns>
-		A string containing the manifest data (unprocessed).   It is a good idea
-		to use parse_manifest to ensure this data is correct.
+		Binary data of size of 1 block. Several blocks XORed together.
 	"""
 
 	response = _remote_query_helper_sock(socket, "X" + bitstring)
