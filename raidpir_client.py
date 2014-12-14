@@ -83,7 +83,6 @@ def _request_helper(rxgobj):
 	# go until there are no more requests
 	while thisrequest != ():
 		socket = thisrequest[0]['socket']
-		print socket
 		bitstring = thisrequest[2]
 		try:
 			# request the XOR block...
@@ -103,8 +102,6 @@ def _request_helper(rxgobj):
 			#rxgobj.notify_success(thisrequest, xorblock)
 			#sys.stdout.write('.')
 			#sys.stdout.flush()
-		
-
 		
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest()
@@ -126,13 +123,13 @@ def _request_helper_chunked(rxgobj):
 
 			# request the XOR block...
 			if rqtype == 1: # chunks and seed expansion
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng(socket, chunks)
+				raidpirlib.request_xorblock_from_mirror_chunked_rng(socket, chunks)
 
 			elif rqtype == 2: # chunks, seed expansion and parallel
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks)
+				raidpirlib.request_xorblock_from_mirror_chunked_rng_parallel(socket, chunks)
 
 			else: # only chunks (redundancy)
-				xorblock = raidpirlib.retrieve_xorblock_from_mirror_chunked(socket, chunks)
+				raidpirlib.request_xorblock_from_mirror_chunked(socket, chunks)
 
 		except Exception, e:
 			if 'socked' in str(e):
@@ -143,9 +140,9 @@ def _request_helper_chunked(rxgobj):
 				# otherwise, re-raise...
 				raise  
 
-		else:
+		#else:
 			# we retrieved it successfully...
-			rxgobj.notify_success(thisrequest, xorblock)
+			#rxgobj.notify_success(thisrequest, xorblock)
 			# sys.stdout.write('.')
 			# sys.stdout.flush()
 		
@@ -202,8 +199,8 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		_request_helper(rxgobj)
 		
 		# wait for receiving threads to finish
-		for m in rxgobj.activemirrorinfolist:
-			m['rt'].join()
+		for mirror in rxgobj.activemirrorinfolist:
+			mirror['rt'].join()
 		
 		rxgobj.cleanup()
 	
@@ -226,6 +223,10 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper_chunked, args=[rxgobj]).start()
 
 		_request_helper_chunked(rxgobj)
+		
+		# wait for receiving threads to finish
+		for mirror in rxgobj.activemirrorinfolist:
+			mirror['rt'].join()
 		
 		rxgobj.cleanup()
 
@@ -392,7 +393,7 @@ def parse_options():
 	if _commandlineoptions.numberofthreads == None:
 		_commandlineoptions.numberofthreads = _commandlineoptions.numberofmirrors
 		
-		_commandlineoptions.numberofmirrors = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
+	_commandlineoptions.numberofthreads = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
 
 	if _commandlineoptions.numberofthreads < 1:
 		print "Number of threads must be positive"

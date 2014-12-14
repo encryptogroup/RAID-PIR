@@ -50,9 +50,12 @@ import random
 def rcvlet(requestinfo, rxgobj):
 	sock = requestinfo['mirrorinfo']['socket']
 	data = "0"
-	while data!='' and (len(requestinfo['blocksrequested']) + len(requestinfo['blocksneeded']) )>0:
+	first = True
+	while data!='' and len(requestinfo['blocksrequested'])>0 or first:
+		first = False
 		data = session.recvmessage(sock)
-		rxgobj.notify_success(requestinfo['mirrorinfo'], data)		
+		rxgobj.notify_success(requestinfo['mirrorinfo'], data)
+
 
 
 def _reconstruct_block(blockinfolist):
@@ -80,8 +83,8 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 
 	for m in range(k):
 		for c in results:
-			if c in responses[m]['xorblockdict']:
-				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m]['xorblockdict'][c]) 
+			if c in responses[m]:
+				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m][c]) 
 
 	return results
 
@@ -508,7 +511,8 @@ class RandomXORRequestorChunks:
 			thisrequestinfo = {}
 			thisrequestinfo['mirrorinfo'] = mirrorinfo
 			thisrequestinfo['servingrequest'] = False
-			thisrequestinfo['blocksneeded'] = blocklist[:] #only for client, obviously
+			thisrequestinfo['blocksneeded'] = blocklist[:] # only for the client, obviously
+			thisrequestinfo['blocksrequested'] = []
 
 			if parallel:
 				thisrequestinfo['parallelblocksneeded'] = []
@@ -546,6 +550,11 @@ class RandomXORRequestorChunks:
 			if rng:
 				params['s'] = thisrequestinfo['seed']
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
+			
+			# start separate receiving thread for this socket
+			t = threading.Thread(target=rcvlet, args = [thisrequestinfo, self], name = ("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			thisrequestinfo['rt'] = t
+			t.start()
 
 		
 		#multi block query. map the blocks to the minimum amount of queries
@@ -752,14 +761,13 @@ class RandomXORRequestorChunks:
 
 			# but always release it
 			try:
-				stillserving = False
 				for requestinfo in self.activemirrorinfolist:
 	
 				
 					# if this mirror is serving a request, skip it...
-					if requestinfo['servingrequest']:
-						stillserving = True
-						continue
+# 					if requestinfo['servingrequest']:
+# 						stillserving = True
+# 						continue
 					
 
 					if self.parallel:
@@ -768,8 +776,11 @@ class RandomXORRequestorChunks:
 						# otherwise set it to be taken...
 						requestinfo['servingrequest'] = True
 
+						blocknums = requestinfo['parallelblocksneeded'].pop(0)
+						requestinfo['blocksrequested'].append(blocknums)
+
 						if self.rng:
-							return (requestinfo['mirrorinfo'], requestinfo['parallelblocksneeded'][0], requestinfo['blockchunklist'][0], 2)
+							return (requestinfo['mirrorinfo'], blocknums, requestinfo['blockchunklist'].pop(0), 2)
 						else:
 							raise Exception("Parallel Query without RNG not yet implemented!") #TODO
 
@@ -782,13 +793,15 @@ class RandomXORRequestorChunks:
 						# otherwise set it to be taken...
 						requestinfo['servingrequest'] = True
 
-						if self.rng:
-							return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockchunklist'][0], 1)
-						else:
-							return (requestinfo['mirrorinfo'], requestinfo['blocksneeded'][0], requestinfo['blockchunklist'][0], 0)
+						blocknum = requestinfo['blocksneeded'].pop(0)
+						requestinfo['blocksrequested'].append(blocknum)
 
-				if not stillserving:
-					return ()
+						if self.rng:
+							return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 1)
+						else:
+							return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
+
+				return ()
 
 			finally:
 				# I always want someone else to be able to get the lock
@@ -849,7 +862,7 @@ class RandomXORRequestorChunks:
 
 
 
-	def notify_success(self, xorrequesttuple, xorblock):
+	def notify_success(self, thismirrorsinfo, xorblock):
 		"""
 		<Purpose>
 			Handles the receipt of an xorblock
@@ -872,31 +885,17 @@ class RandomXORRequestorChunks:
 		self.tablelock.acquire()
 
 		try:
-			thismirrorsinfo = xorrequesttuple[0]
 		
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
-				
-					# let's mark it as inactive and pop off the blocks, etc.
-					activemirrorinfo['servingrequest'] = False
-					
 
 					if self.parallel:
 						#use blocknumbers[0] as index from now on
-						blocknumbers = activemirrorinfo['parallelblocksneeded'].pop(0)
-
-						activemirrorinfo['blockchunklist'].pop(0) 
-
-						#assert(blocknumber == xorrequesttuple[1]) #TODO modify this checks for parallel query [this one contains the blocknumbers]
-						#assert(bitstring == xorrequesttuple[2])
+						blocknumbers = activemirrorinfo['blocksrequested'].pop(0)
 		
-						# add the xorblockinfo to the dict
-						xorblockdict = {}
-						#xorblockdict['bitstring'] = xorrequesttuple[2]
-						xorblockdict['mirrorinfo'] = thismirrorsinfo
-						xorblockdict['xorblockdict'] = msgpack.unpackb(xorblock) #the mirror response: dict r blocks, index = chunk number
-						self.returnedxorblocksdict[blocknumbers[0]].append(xorblockdict)
+						# add the xorblocks to the dict
+						self.returnedxorblocksdict[blocknumbers[0]].append(msgpack.unpackb(xorblock))
 
 						#print "Appended blocknumber", blocknumbers[0], "from", thismirrorsinfo['port']
 
@@ -934,19 +933,10 @@ class RandomXORRequestorChunks:
 					#single block query:
 					else:
 					# remove the block and bitstring (asserting they match what we said before)
-						blocknumber = activemirrorinfo['blocksneeded'].pop(0)
-
-						bitstring = activemirrorinfo['blockchunklist'].pop(0) 
-
-						assert(blocknumber == xorrequesttuple[1])
-						#assert(bitstring == xorrequesttuple[2])
+						blocknumber = activemirrorinfo['blocksrequested'].pop(0)
 		
-						# add the xorblockinfo to the dict
-						xorblockdict = {}
-						#xorblockdict['bitstring'] = xorrequesttuple[2]
-						xorblockdict['mirrorinfo'] = thismirrorsinfo
-						xorblockdict['xorblock'] = xorblock
-						self.returnedxorblocksdict[blocknumber].append(xorblockdict)
+						# add the xorblock to the dict
+						self.returnedxorblocksdict[blocknumber].append(xorblock)
 
 						# if we don't have all of the pieces, continue
 						if len(self.returnedxorblocksdict[blocknumber]) != self.privacythreshold:

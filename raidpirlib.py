@@ -200,11 +200,9 @@ def transmit_mirrorinfo(mirrorinfo, vendorlocation, defaultvendorport=62293):
 		Sends our mirror information to a vendor.   
 
 	<Arguments>
-		vendorlocation: A string that contains the vendor location.   This can be 
-										of the form "IP:port", "hostname:port", "IP", or "hostname"
+		vendorlocation: A string that contains the vendor location.   This can be of the form "IP:port", "hostname:port", "IP", or "hostname"
 
-		defaultvendorport: the port to use if the vendorlocation does not include 
-											 one.
+		defaultvendorport: the port to use if the vendorlocation does not include one.
 		
 
 	<Exceptions>
@@ -239,11 +237,9 @@ def retrieve_rawmanifest(vendorlocation, defaultvendorport = 62293):
 		data in any way.
 
 	<Arguments>
-		vendorlocation: A string that contains the vendor location.   This can be 
-										of the form "IP:port", "hostname:port", "IP", or "hostname"
+		vendorlocation: A string that contains the vendor location.   This can be of the form "IP:port", "hostname:port", "IP", or "hostname"
 
-		defaultvendorport: the port to use if the vendorlocation does not include 
-											 one.
+		defaultvendorport: the port to use if the vendorlocation does not include one.
 		
 
 	<Exceptions>
@@ -306,6 +302,10 @@ def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 
 	return response
 
+# only request a xorblock, without receiving it
+def request_xorblock_from_mirror_chunked(socket, chunks):
+		session.sendmessage(socket, "C" + msgpack.packb(chunks))
+
 
 def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 
@@ -317,6 +317,10 @@ def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 
 	return response
 
+# only request a xorblock, without receiving it
+def request_xorblock_from_mirror_chunked_rng(socket, chunks):
+		session.sendmessage(socket, "R" + msgpack.packb(chunks))
+
 
 def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 
@@ -327,6 +331,11 @@ def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 	# print "CHUNKED RNG PAR Query", len(msgpack.packb(chunks)), "|", len(response)
 
 	return response
+
+
+# only request a xorblock, without receiving it
+def request_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
+		session.sendmessage(socket, "M" + msgpack.packb(chunks))
 
 
 def retrieve_mirrorinfolist(vendorlocation, defaultvendorport = 62293):

@@ -65,7 +65,6 @@ import SocketServer
 # to run in the background...
 import daemon
 
-
 # for logging purposes...
 import time
 
