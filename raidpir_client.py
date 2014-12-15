@@ -343,7 +343,7 @@ def parse_options():
 	parser.add_option("","--vendorip", dest="vendorip", type="string", metavar="IP", 
 				default=None, help="Vendor IP for overwriting the value from manifest; for testing purposes.")
 
-	parser.add_option("","--manifestfile", dest="manifestfilename", 
+	parser.add_option("-m","--manifestfile", dest="manifestfilename", 
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
@@ -361,7 +361,7 @@ def parse_options():
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
 				help="Query one block per chunk in parallel (default False). Requires -r")
 
-	parser.add_option("","--numberofthreads", dest="numberofthreads",
+	parser.add_option("-t","--numberofthreads", dest="numberofthreads",
 				type="int", default=None,
 				help="How many threads should concurrently contact servers? (default numberofmirrors)")
 

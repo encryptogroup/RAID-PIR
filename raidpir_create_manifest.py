@@ -94,16 +94,16 @@ def parse_options():
 				metavar="manifestfile", default="manifest.dat", 
 				help="Use this name for the manifest file (default manifest.dat)")
 
-	parser.add_option("","--vendorport", dest="vendorport", type="int", 
+	parser.add_option("-p","--vendorport", dest="vendorport", type="int", 
 				metavar="port", default=62293,
 				help="The vendor will listen on this port (default 62293)")
 
 
-	parser.add_option("","--hashalgorithm", dest="hashalgorithm", type="string", 
+	parser.add_option("-H","--hashalgorithm", dest="hashalgorithm", type="string", 
 				metavar="algorithm", default="sha256-raw", 
 				help="Chooses which algorithm to use for the secure hash (default sha256-raw)")
 
-	parser.add_option("","--offsetalgorithm", dest="offsetalgorithm", 
+	parser.add_option("-o","--offsetalgorithm", dest="offsetalgorithm", 
 				type="string", metavar="algorithm", default="nogaps",
 				help="Chooses how to put the files into blocks (default is nogaps). Currently only nogaps is supported.")
 

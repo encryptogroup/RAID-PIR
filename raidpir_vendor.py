@@ -305,7 +305,7 @@ def parse_options():
 
 	parser = optparse.OptionParser()
 
-	parser.add_option("", "--manifestfile", dest="manifestfilename",
+	parser.add_option("-m", "--manifestfile", dest="manifestfilename",
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 

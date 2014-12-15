@@ -408,7 +408,7 @@ def parse_options():
 				type="string", metavar="vendorIP:port", default="",
 				help="Specifies the vendor to retrieve the manifest from (default None).")
 
-	parser.add_option("","--manifestfile", dest="manifestfilename", 
+	parser.add_option("-m","--manifestfile", dest="manifestfilename", 
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
