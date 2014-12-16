@@ -387,11 +387,14 @@ def parse_options():
 
 	# RNG or parallel query without chunks activated
 	if (_commandlineoptions.rng or _commandlineoptions.parallel) and not _commandlineoptions.redundancy:
-		print "Chunks must be enabled and redundancy set (-r) to use RNG or parallel queries!"
+		print "Chunks must be enabled and redundancy set (-r <number>) to use RNG or parallel queries!"
 		sys.exit(1)
 
 	if _commandlineoptions.numberofthreads == None:
 		_commandlineoptions.numberofthreads = _commandlineoptions.numberofmirrors
+	elif _commandlineoptions.numberofthreads > _commandlineoptions.numberofmirrors:
+		print "Number of threads must be less or equal to number of mirrors (", _commandlineoptions.numberofmirrors, ")"
+		sys.exit(1)
 
 	_commandlineoptions.numberofthreads = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
 
@@ -405,6 +408,7 @@ def parse_options():
 
 	#filename(s)
 	_commandlineoptions.filestoretrieve = remainingargs
+
 
 
 def main():
@@ -462,4 +466,3 @@ if __name__ == '__main__':
 
 	parse_options()
 	main()
-
