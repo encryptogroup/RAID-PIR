@@ -24,20 +24,20 @@ def get_localIP_to_remoteIP(connection_type, external_ip, external_port=80):
 	"""
 	<Purpose>
 		Resolve the local ip used when connecting outbound to an external ip.
-	
+
 	<Arguments>
 		connection_type:
 			The type of connection to attempt. See socket.socket().
-		
+
 		external_ip:
 			The external IP to attempt to connect to.
-			
+
 		external_port:
 			The port on the remote host to attempt to connect to.
-	
+
 	<Exceptions>
 		As with socket.socket(), socketobj.connect(), etc.
-	
+
 	<Returns>
 		The locally assigned IP for the connection.
 	"""
@@ -82,31 +82,31 @@ def getmyip():
 
 	# I got some of this from: http://groups.google.com/group/comp.lang.python/browse_thread/thread/d931cdc326d7032b?hl=en
 	# however, it has been adapted...
-	
+
 	# Initialize these to None, so we can detect a failure
 	myip = None
-	
+
 	# It's possible on some platforms (Windows Mobile) that the IP will be
 	# 0.0.0.0 even when I have a public IP and the external IP is up. However, if
 	# I get a real connection with SOCK_STREAM, then I should get the real
 	# answer.
 	for conn_type in [socket.SOCK_DGRAM, socket.SOCK_STREAM]:
-				
-		# Try each stable IP  
-		for ip_addr in STABLE_PUBLIC_IPS:  
+
+		# Try each stable IP
+		for ip_addr in STABLE_PUBLIC_IPS:
 			try:
-				# Try to resolve using the current connection type and 
+				# Try to resolve using the current connection type and
 				# stable IP, using port 80 since some platforms panic
 				# when given 0 (FreeBSD)
 				myip = get_localIP_to_remoteIP(conn_type, ip_addr, 80)
 			except (socket.error, socket.timeout):
-				# We can ignore any networking related errors, since we want to try 
+				# We can ignore any networking related errors, since we want to try
 				# the other connection types and IP addresses. If we fail,
 				# we will eventually raise an exception anyways.
 				pass
 			else:
 				# Return immediately if the IP address is good
-				if myip != None and myip != '' and myip != "0.0.0.0": 
+				if myip != None and myip != '' and myip != "0.0.0.0":
 					return myip
 
 

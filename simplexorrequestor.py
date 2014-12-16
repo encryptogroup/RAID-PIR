@@ -97,7 +97,7 @@ class InsufficientMirrors(Exception):
 # modified. If you wanted to change the policy by which mirrors are selected,
 # the failure behavior for offline mirrors, or the way in which blocks
 # are selected.
-class RandomXORRequestor:
+class RandomXORRequestor(object):
 	"""
 	<Purpose>
 		Basic XORRequestGenerator that just picks some number of random mirrors
@@ -461,7 +461,7 @@ class RandomXORRequestor:
 
 
 
-class RandomXORRequestorChunks:
+class RandomXORRequestorChunks(object):
 
 
 	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, pollinginterval=.1):

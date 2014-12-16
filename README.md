@@ -3,7 +3,7 @@
 
 RAID-PIR is an efficient implementation of [private information retrieval](https://en.wikipedia.org/wiki/Private_information_retrieval) with multiple servers.
 
-Details of the underlying protocols can be found in the paper "[RAID-PIR: Practical Multi-Server PIR](http://encrypto.de/papers/DHS14.pdf)" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by: 
+Details of the underlying protocols can be found in the paper "[RAID-PIR: Practical Multi-Server PIR](http://encrypto.de/papers/DHS14.pdf)" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by:
 * [Daniel Demmler](http://www.ec-spride.tu-darmstadt.de/en/research-groups/engineering-cryptographic-protocols-group/staff/daniel-demmler/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
 * [Amir Herzberg](https://sites.google.com/site/amirherzberg/), Bar Ilan University
 * [Thomas Schneider](http://www.thomaschneider.de/), TU Darmstadt, [ENCRYPTO](http://encrypto.de)
@@ -81,7 +81,7 @@ Vendor Server started at 127.0.0.1 : 62293
 In other terminals, you can run mirror instances as well.
 Change your terminal to the mirror's directory (such as `../mirror1`).
 
-Each mirror will need to know where to locate the mirror files, what ports to use, and a copy of the manifest file. 
+Each mirror will need to know where to locate the mirror files, what ports to use, and a copy of the manifest file.
 
 Command: `python raidpir_mirror.py --ip <MIRROR-IP> --port <MIRROR-PORT> --foreground --mirrorroot <DIR> --retrievemanifestfrom <VENDOR-IP>`
 
@@ -103,7 +103,7 @@ Mirror Server started at 127.0.0.1 : 62002
 
 Repeat this for the number of mirror servers you want to start. The minimum number of mirror servers required for RAID-PIR (and any other multi-server PIR schemes) is 2.
 
-### 3. Running a RAID-PIR client 
+### 3. Running a RAID-PIR client
 
 Now you can retrieve files using `raidpir_client.py`. Open a terminal in the client directory. First you need the manifest file, which tells you a list of available files and what blocks they map to. The manifest can be requested from the vendor with the same call as the file query.
 To retrieve the file `1.jpg`, simply say where to retrieve the manifest from and then the filename to retrieve it.
@@ -130,11 +130,11 @@ You can activate several optimizations for the client by specifying command line
 
 Please see [our RAID-PIR paper](http://encrypto.de/papers/DHS14.pdf) for a detailed explanation of how these optimizations work.
 
-### 4. Restarting the Mirrors or Vendor 
+### 4. Restarting the Mirrors or Vendor
 
 You can try to use CTRL-C or CTRL-Z on some OSes to end the RAID-PIR processes. On other OSes, this will raise an exception but will not exit. Also, check your process manager and see if you really terminated the processes. Sometimes this doesn't work due to the multi-threading in RAID-PIR.
 
-A quick and dirty solution is to end all python processes using `killall python` (**Warning:** This will also end all other python processes, not just RAID-PIR!). 
+A quick and dirty solution is to end all python processes using `killall python` (**Warning:** This will also end all other python processes, not just RAID-PIR!).
 In case RAID-PIR still won't terminate properly, try `killall -9 python` (**Warning:** This will most definitely also end all other python processes!). If you know how to solve this more elegantly, please let me know.
 
 You can then re-run the code and your changes will be taken into account.

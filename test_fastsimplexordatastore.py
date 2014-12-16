@@ -8,13 +8,13 @@ letterxordatastore = fastsimplexordatastore.XORDatastore(size, 16)
 startpos = 0
 for char in range(ord("A"), ord("Q")):
 	# put 1K of those chars in...
-	letterxordatastore.set_data(startpos, chr(char) * size) 
+	letterxordatastore.set_data(startpos, chr(char) * size)
 	startpos = startpos + size
 
 # can read data out...
 assert(letterxordatastore.get_data(size, 1) == 'B')
 
-# let's create a bitstring that uses A, C, and P.   
+# let's create a bitstring that uses A, C, and P.
 bitstring = chr(int('10100000', 2)) + chr(int('00000001',2))
 xorresult = letterxordatastore.produce_xor_from_bitstring(bitstring)
 

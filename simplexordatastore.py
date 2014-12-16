@@ -106,7 +106,7 @@ def do_xor_old(string_a, string_b):
 	return result
 
 
-class XORDatastore:
+class XORDatastore(object):
 	"""
 	<Purpose>
 		Class that has information for an XORdatastore.   This data structure can

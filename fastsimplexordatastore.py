@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Justin Cappos
 
@@ -6,12 +6,12 @@
 	May 25th, 2011
 
 <Description>
-	A wrapper for a C-based datastore.   This uses objects, etc. to make 
+	A wrapper for a C-based datastore.   This uses objects, etc. to make
 	the C interface more Pythonic...
 
-	This is really just a version of the Python datastore with the Python code 
+	This is really just a version of the Python datastore with the Python code
 	replaced with the C extension.   I left in all of the error checking.
-	
+
 """
 
 import fastsimplexordatastore_c
@@ -28,7 +28,7 @@ def do_xor(string_a, string_b):
 	return fastsimplexordatastore_c.do_xor(string_a, string_b, len(string_a))
 
 
-class XORDatastore:
+class XORDatastore(object):
 	"""
 	<Purpose>
 		Class that has information for an XORdatastore.   This data structure can
@@ -44,19 +44,19 @@ class XORDatastore:
 	ds = None
 
 	# these are public so that a caller can read information about a created
-	# datastore.   They should not be changed.   
+	# datastore.   They should not be changed.
 	numberofblocks = None
 	sizeofblocks = None
 
 	def __init__(self, block_size, num_blocks):  # allocate
 		"""
 		<Purpose>
-			Allocate a place to store data for efficient XOR.   
+			Allocate a place to store data for efficient XOR.
 
 		<Arguments>
 			block_size: the size of each block.   This must be a positive int / long.
 									The value must be a multiple of 64
-			
+
 			num_blocks: the number of blocks.   This must be a positive integer
 
 		<Exceptions>
@@ -84,7 +84,7 @@ class XORDatastore:
 		self.sizeofblocks = block_size
 
 		self.ds = fastsimplexordatastore_c.Allocate(block_size, num_blocks)
-		
+
 
 	def produce_xor_from_bitstring(self, bitstring):
 		"""
@@ -97,7 +97,7 @@ class XORDatastore:
 								 of this string must be ceil(numberofblocks / 8.0).   Extra
 								 bits are ignored (e.g. if are 10 blocks, the last
 								 six bits are ignored).
-			
+
 		<Exceptions>
 			TypeError is raised if the bitstring is invalid
 
@@ -113,7 +113,7 @@ class XORDatastore:
 
 
 		return fastsimplexordatastore_c.Produce_Xor_From_Bitstring(self.ds, bitstring)
-			
+
 
 
 	def set_data(self, offset, data_to_add):
@@ -122,12 +122,12 @@ class XORDatastore:
 			Sets the raw data in an XORdatastore.   It ignores block layout, etc.
 
 		<Arguments>
-			offset: this is a non-negative integer that must be less than the 
-							numberofblocks * blocksize.   
-			
+			offset: this is a non-negative integer that must be less than the
+							numberofblocks * blocksize.
+
 			data_to_add: the string that should be added.   offset + len(data_to_add)
 								must be less than the numberofblocks * blocksize.
-			
+
 		<Exceptions>
 			TypeError if the arguments are the wrong type or have invalid values.
 
@@ -148,21 +148,19 @@ class XORDatastore:
 			raise TypeError("Offset + added data overflows the XORdatastore")
 
 		return fastsimplexordatastore_c.SetData(self.ds, offset, data_to_add)
-		
+
 
 
 	def get_data(self, offset, quantity):
 		"""
 		<Purpose>
-			Returns raw data from an XORdatastore.   It ignores block layout, etc.
+			Returns raw data from an XORdatastore. It ignores block layout, etc.
 
 		<Arguments>
-			offset: this is a non-negative integer that must be less than the 
-							numberofblocks * blocksize.   
-			
-			quantity: quantity must be a positive integer.   offset + quantity 
-								must be less than the numberofblocks * blocksize.
-			
+			offset: this is a non-negative integer that must be less than the numberofblocks * blocksize.
+
+			quantity: quantity must be a positive integer. offset + quantity must be less than the numberofblocks * blocksize.
+
 		<Exceptions>
 			TypeError if the arguments are the wrong type or have invalid values.
 
