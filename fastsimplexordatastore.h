@@ -12,7 +12,7 @@ typedef int datastore_descriptor;
 
 typedef struct {
 	long numberofblocks;      // Blocks in the datastore
-	long sizeofablock;        // Bytes in a block.   
+	long sizeofablock;        // Bytes in a block.
 	char *raw_datastore;  // This points to what malloc returns...
 	uint64_t *datastore;      // This is the DWORD aligned start to the datastore
 } XORDatastore;

@@ -1,12 +1,12 @@
-/* Author: Justin Cappos 
- * File: fastsimplexordatastore.c 
+/* Author: Justin Cappos
+ * File: fastsimplexordatastore.c
  * Purpose: The fastsimplexordatastore.   A simple, C-based datastore
  */
 
 #include "Python.h"
 #include "fastsimplexordatastore.h"
 
-/* I've decided not to mess with making this a Python object.   
+/* I've decided not to mess with making this a Python object.
  * Undoubtably I could do so, but it is harder to understand and verify
  * it doesn't have some sort of bug.   I'll make the C <-> Python portion
  * straightforward and have an intermediate module that makes this
@@ -61,7 +61,7 @@ static int is_table_entry_used(int i) {
 
 
 
-// This allocates memory and stores the size / num_blocks for 
+// This allocates memory and stores the size / num_blocks for
 // error checking later
 static datastore_descriptor allocate(long block_size, long num_blocks)  {
 	int i;
@@ -89,7 +89,7 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 			xordatastoretable[i].raw_datastore = malloc(num_blocks * block_size + sizeof(uint64_t));
 			// Zero it out
 			bzero(xordatastoretable[i].raw_datastore, num_blocks * block_size + sizeof(uint64_t));
-			
+
 			// and align it...
 			xordatastoretable[i].datastore = (uint64_t *) dword_align(xordatastoretable[i].raw_datastore);
 			return i;
@@ -99,7 +99,7 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 	// The table is full!   I really should expand it...
 	printf("Internal Error: I need to expand the table size (unimplemented)\n");
 	return -1;
-} 
+}
 
 
 
@@ -131,7 +131,7 @@ static PyObject *Allocate(PyObject *module, PyObject *args) {
 
 
 
-// This function needs to be fast.   It is a good candidate for releasing 
+// This function needs to be fast.   It is a good candidate for releasing
 // Python's GIL
 
 static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, uint64_t *resultbuffer) {
@@ -165,7 +165,7 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 
 
 
-// Does XORs given a bit string.   This is the common case and so should be 
+// Does XORs given a bit string.   This is the common case and so should be
 // optimized.
 
 // Python Wrapper object
@@ -207,14 +207,14 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	free(raw_resultbuffer);
 
 	return return_str_obj;
-} 
+}
 
 
 
 
 
 
-// This is used to populate the datastore.   It can also be used to add 
+// This is used to populate the datastore.   It can also be used to add
 // memoization data.
 
 // Python wrapper (only)...
@@ -222,7 +222,7 @@ static PyObject *SetData(PyObject *module, PyObject *args) {
 	long long offset;
 	datastore_descriptor ds;
 	char *stringbuffer;
-	int quantity; // BUG: This probably should be a larger type.   
+	int quantity; // BUG: This probably should be a larger type.
 
 
 	if (!PyArg_ParseTuple(args, "iLs#", &ds, &offset, &stringbuffer, &quantity)) {
@@ -252,9 +252,9 @@ static PyObject *SetData(PyObject *module, PyObject *args) {
 
 
 
-// Returns the data stored at an offset.   Note that we move away from 
-// blocks here.   We might as well do the math in Python.   We use this to do 
-// integrity checking and serve legacy clients.   It is not needed for the 
+// Returns the data stored at an offset.   Note that we move away from
+// blocks here.   We might as well do the math in Python.   We use this to do
+// integrity checking and serve legacy clients.   It is not needed for the
 // usual mirror actions.
 
 // Python wrapper (only)...
@@ -299,7 +299,7 @@ static void deallocate(datastore_descriptor ds){
 		xordatastoretable[ds].raw_datastore = NULL;
 		xordatastoretable[ds].datastore = NULL;
 	}
-} 
+}
 
 
 
@@ -371,7 +371,7 @@ static char *fast_XOR(char *dest, const char *data, long stringlength) {
 }
 
 
-// A convenience function for XORing blocks of data together. It is used by 
+// A convenience function for XORing blocks of data together. It is used by
 // the client to compute the result and XOR bitstrings
 static PyObject *do_xor(PyObject *module, PyObject *args) {
 	const char *str1, *str2;
@@ -402,7 +402,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 
 	// Now, let's do the XOR...
 	fast_XOR(useddestbuffer, str2, length);
-	
+
 	// Okay, let's return the answer!
 	PyObject *return_str_obj = Py_BuildValue("s#",useddestbuffer,length);
 
