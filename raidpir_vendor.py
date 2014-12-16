@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Daniel Demmler
 	(inspired from upPIR by Justin Cappos)
@@ -9,11 +9,11 @@
 
 <Description>
 	Vendor code for RAID-PIR. The vendor serves the manifest and mirror list.
-	Thus it acts as a way for mirrors to advertise that they are alive and 
-	for clients to find living mirrors.   
+	Thus it acts as a way for mirrors to advertise that they are alive and
+	for clients to find living mirrors.
 
 	For more technical explanation, please see the paper.
-	
+
 <Options>
 
 	See Below
@@ -22,16 +22,16 @@
 
 # This file is laid out in three main parts.   First, there are helper routines
 # that manage the addition and expiration of mirrorlist content.   Following
-# this are the server routines that handle communications with the clients 
-# or mirrors.   The final part contains the argument parsing and main 
+# this are the server routines that handle communications with the clients
+# or mirrors.   The final part contains the argument parsing and main
 # function.   To understand the code, it is recommended one starts at main
 # and reads from there.
 #
 # EXTENSION POINTS:
 #
-# To handle malicious mirrors, the client and vendor will need to have 
+# To handle malicious mirrors, the client and vendor will need to have
 # support for malicious block reporting.   This change will be primarily
-# in the server portion although, the mirror would also need to include 
+# in the server portion although, the mirror would also need to include
 # a way to blacklist offending mirrors to prevent them from re-registering
 
 
@@ -92,7 +92,7 @@ def _log(stringtolog):
 _global_rawmanifestdata = None
 _global_rawmirrorlist = None
 
-# These are more defensible.   
+# These are more defensible.
 _global_mirrorinfodict = {}
 _global_mirrorinfolock = threading.Lock()
 
@@ -112,12 +112,12 @@ def _check_for_expired_mirrorinfo():
 			now = time.time()
 			# walk through the mirrors and remove any that are over time...
 			for index in _global_mirrorinfodict:
-		
+
 				# if it's expired, remove the entry...
 				if now > _commandlineoptions.mirrorexpirytime + _global_mirrorinfodict[index]['advertisetime']:
 					del _global_mirrorinfodict[index]
 					_log("RAID-PIR Vendor Removing Mirror due to timeout: " + index)
-		
+
 			mirrorlist = []
 			# now let's rebuild the mirrorlist
 			for index in _global_mirrorinfodict:
@@ -138,7 +138,7 @@ def _add_mirrorinfo_to_list(thismirrorinfo):
 	_log("RAID-PIR Vendor _add_mirrorinfo_to_list " + str(thismirrorinfo))
 
 	# add mirror information along with the time
-	index = thismirrorinfo['ip'] + ":" + str(thismirrorinfo['port']);
+	index = thismirrorinfo['ip'] + ":" + str(thismirrorinfo['port'])
 
 	# get the lock and add it to the dict
 	_global_mirrorinfolock.acquire()
@@ -150,16 +150,16 @@ def _add_mirrorinfo_to_list(thismirrorinfo):
 
 	finally:
 		_global_mirrorinfolock.release()
-	
 
-	
+
+
 
 
 ######################### Serve RAID-PIR Vendor requests ########################
 
 
 # I don't need to change this much, I think...
-class ThreadedVendorServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer): 
+class ThreadedVendorServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 	allow_reuse_address = True
 
 
@@ -178,7 +178,7 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 
 			session.sendmessage(self.request, _global_rawmanifestdata)
 			_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " manifest request")
-	
+
 			# done!
 			return
 
@@ -200,8 +200,8 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " mirror advertise")
 
 			mirrorrawdata = requeststring[len('MIRRORADVERTISE'):]
-			
-			# handle the case where the mirror provides data that is larger than 
+
+			# handle the case where the mirror provides data that is larger than
 			# we want to serve
 			if len(mirrorrawdata) > _commandlineoptions.maxmirrorinfo:
 				session.sendmessage(self.request, "Error, mirrorinfo too large!")
@@ -222,15 +222,15 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 				session.sendmessage(self.request, "Error, mirrorinfo has an invalid format.")
 				_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " mirrorinfo has an invalid format")
 				return
-			
-			
+
+
 			#is the mirror to add coming from the same ip?
 			if _commandlineoptions.checkmirrorip:
 				if mirrorinfodict['ip'] != remoteip:
 					session.sendmessage(self.request, "Error, must provide mirrorinfo from the mirror's IP")
 					_log("RAID-PIR Vendor "+remoteip+" "+str(remoteport)+" mirrorinfo provided from the wrong IP")
 					return
-			
+
 			# add the information to the mirrorlist
 			_add_mirrorinfo_to_list(mirrorinfodict)
 
@@ -264,11 +264,11 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 def start_vendor_service(manifestdict, ip, port):
 
 	# this should be done before we are called
-	assert(_global_rawmanifestdata != None)
+	assert _global_rawmanifestdata != None
 
 	# create the handler / server
 	vendorserver = ThreadedVendorServer((ip, port), ThreadedVendorRequestHandler)
-	
+
 
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	threading.Thread(target=vendorserver.serve_forever, name="RAID-PIR Vendor server").start()
@@ -285,7 +285,7 @@ def parse_options():
 
 	<Arguments>
 		None
-	
+
 	<Side Effects>
 		All relevant data is added to _commandlineoptions
 
@@ -301,7 +301,7 @@ def parse_options():
 	global _logfo
 
 	# should be true unless we're initing twice...
-	assert(_commandlineoptions == None)
+	assert _commandlineoptions == None
 
 	parser = optparse.OptionParser()
 
@@ -341,7 +341,7 @@ def parse_options():
 
 
 	# check the maxmirrorinfo
-	if _commandlineoptions.maxmirrorinfo <= 0: 
+	if _commandlineoptions.maxmirrorinfo <= 0:
 		print "Max mirror info size must be positive"
 		sys.exit(1)
 
@@ -357,9 +357,9 @@ def parse_options():
 
 def main():
 	global _global_rawmanifestdata
-	global _global_rawmirrorlist 
+	global _global_rawmirrorlist
 
-	
+
 	# read in the manifest file
 	rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
 
@@ -382,8 +382,8 @@ def main():
 		vendorport = manifestdict['vendorport']
 	else:
 		vendorport = _commandlineoptions.port
-	
-	
+
+
 	# We should detach here.   I don't do it earlier so that error
 	# messages are written to the terminal...   I don't do it later so that any
 	# threads don't exist already.   If I do put it much later, the code hangs...
@@ -406,7 +406,7 @@ if __name__ == '__main__':
 		print "RAID-PIR Vendor", raidpirlib.pirversion
 		main()
 	except Exception, e:
-		# log errors to prevent silent exiting...   
+		# log errors to prevent silent exiting...
 		print(str(type(e)) + " " + str(e))
 		# this mess prints a not-so-nice traceback, but it does contain all relevant info
 		_log(str(traceback.format_tb(sys.exc_info()[2])))

@@ -1,16 +1,16 @@
 # This module wraps communications in a signaling protocol.	 The purpose is to
-# overlay a connection-based protocol with explicit message signaling.	 
+# overlay a connection-based protocol with explicit message signaling.
 #
 # The protocol is to send the size of the message followed by \n and then the
-# message itself.	 The size of a message must be able to be stored in 
+# message itself.	 The size of a message must be able to be stored in
 # sessionmaxdigits.	 A size of -1 indicates that this side of the connection
 # should be considered closed.
 #
-# Note that the client will block while sending a message, and the receiver 
-# will block while recieving a message.	 
+# Note that the client will block while sending a message, and the receiver
+# will block while recieving a message.
 #
-# While it should be possible to reuse the connectionbased socket for other 
-# tasks so long as it does not overlap with the time periods when messages are 
+# While it should be possible to reuse the connectionbased socket for other
+# tasks so long as it does not overlap with the time periods when messages are
 # being sent, this is inadvisable.
 
 class SessionEOF(Exception):
@@ -29,38 +29,38 @@ def recvmessage(socketobj):
 
 		if currentbyte == '\n':
 			break
-		
+
 		# not a valid digit
 		if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
-			raise ValueError, "Bad message size"
-		
+			raise ValueError("Bad message size")
+
 		messagesizestring = messagesizestring + currentbyte
 
 	else:
 		# too large
-		# raise ValueError, "Bad message size" #TODO check that this is corrent
+		# raise ValueError, "Bad message size" #TODO check that this is correct
 		return ''
 
 	messagesize = int(messagesizestring)
-	
+
 	# nothing to read...
 	if messagesize == 0:
 		return ''
 
 	# end of messages
 	if messagesize == -1:
-		raise SessionEOF, "Connection Closed"
+		raise SessionEOF("Connection Closed")
 
 	if messagesize < 0:
-		raise ValueError, "Bad message size"
+		raise ValueError("Bad message size")
 
 	data = ''
 	while len(data) < messagesize:
 		chunk =	socketobj.recv(messagesize-len(data))
-		if chunk == '': 
-			raise SessionEOF, "Connection Closed"
+		if chunk == '':
+			raise SessionEOF("Connection Closed")
 		data = data + chunk
-	
+
 	return data
 
 # a private helper function
@@ -74,7 +74,7 @@ def _sendhelper(socketobj, data):
 
 
 
-# send the message 
+# send the message
 def sendmessage(socketobj, data):
 	header = str(len(data)) + '\n'
 	_sendhelper(socketobj, header)

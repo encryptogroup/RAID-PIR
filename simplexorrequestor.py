@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Daniel Demmler
 	(inspired from upPIR by Justin Cappos)
@@ -51,7 +51,7 @@ def rcvlet(requestinfo, rxgobj):
 	sock = requestinfo['mirrorinfo']['socket']
 	data = "0"
 	first = True
-	while data!='' and len(requestinfo['blocksrequested'])>0 or first:
+	while data != '' and len(requestinfo['blocksrequested']) > 0 or first:
 		first = False
 		data = session.recvmessage(sock)
 		rxgobj.notify_success(requestinfo['mirrorinfo'], data)
@@ -60,7 +60,7 @@ def rcvlet(requestinfo, rxgobj):
 
 def _reconstruct_block(blockinfolist):
 	# private helper to reconstruct a block
-		
+
 	# xor the blocks together
 	currentresult = blockinfolist[0]
 	for xorblock in blockinfolist[1:]:
@@ -75,16 +75,16 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 
 	results = {}
 	for blocknum in blocknumbers:
-			#map blocknum to chunk
-			index = min(blocknum/chunklen, k-1)
+		#map blocknum to chunk
+		index = min(blocknum/chunklen, k-1)
 
-			if index not in results:
-				results[index] = blocklen*"\0"
+		if index not in results:
+			results[index] = blocklen*"\0"
 
 	for m in range(k):
 		for c in results:
 			if c in responses[m]:
-				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m][c]) 
+				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m][c])
 
 	return results
 
@@ -93,48 +93,48 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 class InsufficientMirrors(Exception):
 	"""There are insufficient mirrors to handle your request"""
 
-# These provide an easy way for the client XOR request behavior to be 
+# These provide an easy way for the client XOR request behavior to be
 # modified. If you wanted to change the policy by which mirrors are selected,
 # the failure behavior for offline mirrors, or the way in which blocks
-# are selected.   
+# are selected.
 class RandomXORRequestor:
 	"""
 	<Purpose>
 		Basic XORRequestGenerator that just picks some number of random mirrors
-		and then retrieves all blocks from them. If any mirror fails or is 
+		and then retrieves all blocks from them. If any mirror fails or is
 		offline, the operation fails.
-		
+
 		The strategy this uses is very, very simple. First we randomly choose
 		$k$ mirrors we want to retrieve blocks from. If at any point, we have
-		a failure when retrieving a block, we replace that mirror with a 
-		mirror we haven't chosen yet.   
+		a failure when retrieving a block, we replace that mirror with a
+		mirror we haven't chosen yet.
 
 	<Side Effects>
 		None.
 
 	<Example Use>
-		>>> rxgobj = RandomXORRequestor(['mirror1','mirror2','mirror3'], 
-						 [23, 45], { ...# manifest dict omitted # }, 2) 
+		>>> rxgobj = RandomXORRequestor(['mirror1','mirror2','mirror3'],
+						 [23, 45], { ...# manifest dict omitted # }, 2)
 
 		>>> print rxgobj.get_next_xorrequest()
 		('mirror3',23, '...')   # bitstring omitted
 		>>> print rxgobj.get_next_xorrequest()
 		('mirror1',23, '...')   # bitstring omitted
 		>>> print rxgobj.get_next_xorrequest()
-		# this will block because we didn't say either of the others 
+		# this will block because we didn't say either of the others
 		# completed and there are no other mirrors waiting
 
-		>>> rxgobj.notify_success(('mirror1',23,'...'), '...') 
+		>>> rxgobj.notify_success(('mirror1',23,'...'), '...')
 		# the bit string and result were omitted from the previous statement
 		>>> print rxgobj.get_next_xorrequest()
 		('mirror1',45, '...')   # bitstring omitted
-		>>> rxgobj.notify_success(('mirror3',23, '...'), '...')  
+		>>> rxgobj.notify_success(('mirror3',23, '...'), '...')
 		>>> print rxgobj.get_next_xorrequest()
 		('mirror1',45, '...')   # bitstring omitted
 		>>> rxgobj.notify_failure(('mirror1',45, '...'))
 		>>> print rxgobj.get_next_xorrequest()
 		('mirror2',45, '...')
-		>>> rxgobj.notify_success(('mirror2',45, '...'), '...')  
+		>>> rxgobj.notify_success(('mirror2',45, '...'), '...')
 		>>> print rxgobj.get_next_xorrequest()
 		()
 
@@ -143,7 +143,7 @@ class RandomXORRequestor:
 
 
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, pollinginterval = .1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, pollinginterval=.1):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
@@ -159,7 +159,7 @@ class RandomXORRequestor:
 											 break privacy
 
 			pollinginterval: the amount of time to sleep between checking for
-											 the ability to serve a mirror.   
+											 the ability to serve a mirror.
 
 		<Exceptions>
 			TypeError may be raised if invalid parameters are given.
@@ -171,7 +171,7 @@ class RandomXORRequestor:
 		self.manifestdict = manifestdict
 		self.privacythreshold = privacythreshold
 		self.pollinginterval = pollinginterval
-		
+
 		if len(mirrorinfolist) < self.privacythreshold:
 			raise InsufficientMirrors("Requested the use of "+str(self.privacythreshold)+" mirrors, but only "+str(len(mirrorinfolist))+" were available.")
 
@@ -189,11 +189,11 @@ class RandomXORRequestor:
 			thisrequestinfo['blocksneeded'] = blocklist[:]
 			thisrequestinfo['blockbitstringlist'] = []
 			thisrequestinfo['blocksrequested'] = []
-			
+
 			# open a socket once:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
-						
+
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -205,12 +205,12 @@ class RandomXORRequestor:
 			params['cl'] = 1 # chunk length, here fixed to 1
 			params['lcl'] = 1 # last chunk length, here fixed to 1
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
-			
+
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args = [thisrequestinfo, self], name = ("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
 			thisrequestinfo['rt'] = t
 			t.start()
-			
+
 
 		bitstringlength = raidpirlib.compute_bitstring_length(manifestdict['blockcount'])
 
@@ -223,17 +223,17 @@ class RandomXORRequestor:
 		# now, let's do the 'derived' ones...
 		for blocknum in xrange(len(blocklist)):
 			thisbitstring = '\0'*bitstringlength
-			
+
 			# xor the random strings together
 			for requestinfo in self.activemirrorinfolist[:-1]:
 				thisbitstring = simplexordatastore.do_xor(thisbitstring, requestinfo['blockbitstringlist'][blocknum])
-	
+
 			# flip the appropriate bit for the block we want
 			thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocklist[blocknum])
-			
+
 			# store the result for the last mirror
 			self.activemirrorinfolist[-1]['blockbitstringlist'].append(thisbitstring)
-		
+
 		# want to have a structure for locking
 		self.tablelock = threading.Lock()
 
@@ -245,7 +245,7 @@ class RandomXORRequestor:
 		for blocknum in blocklist:
 			# make these all empty lists to start with
 			self.returnedxorblocksdict[blocknum] = []
-		
+
 		# and here is where they are put when reconstructed
 		self.finishedblockdict = {}
 
@@ -257,7 +257,7 @@ class RandomXORRequestor:
 		for thisrequestinfo in self.activemirrorinfolist:
 			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "Q")
 			thisrequestinfo['mirrorinfo']['socket'].close()
-			
+
 
 	def get_next_xorrequest(self):
 		"""
@@ -269,7 +269,7 @@ class RandomXORRequestor:
 
 		<Exceptions>
 			InsufficientMirrors if there are not enough mirrors
- 
+
 		<Returns>
 			Either a requesttuple (mirrorinfo, blocknumber, bitstring) or ()
 			when all strings have been retrieved...
@@ -280,9 +280,9 @@ class RandomXORRequestor:
 		#   1) nothing that still needs to be requested -> return ()
 		#   2) requests remain, but all mirrors are busy -> block until ready
 		#   3) there is a request ready -> return the tuple
-		# 
+		#
 
-		# I'll exit via return.   I will loop to sleep while waiting.   
+		# I'll exit via return.   I will loop to sleep while waiting.
 		# I could use a condition variable here, but this should be fine.   There
 		# should almost always be < 5 threads.   Also, why would we start more
 		# threads than there are mirrors we will contact?   (As such, sleeping
@@ -295,23 +295,23 @@ class RandomXORRequestor:
 			try:
 
 				for requestinfo in self.activemirrorinfolist:
-	
+
 					# if this mirror is serving a request, skip it...
 # 					if requestinfo['servingrequest']:
 # 						stillserving = True
 # 						continue
-				
+
 					# this mirror is done...
 					if len(requestinfo['blocksneeded']) == 0:
 						continue
-			
+
 					# otherwise set it to be taken...
 					requestinfo['servingrequest'] = True
 					blocknum = requestinfo['blocksneeded'].pop(0)
 					requestinfo['blocksrequested'].append(blocknum)
-					
+
 					return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop(0))
-				
+
 				#no blocks left to request
 				return ()
 
@@ -321,7 +321,7 @@ class RandomXORRequestor:
 
 			# otherwise, I've looked an nothing is ready...   I'll sleep and retry
 			time.sleep(self.pollinginterval)
-	
+
 
 
 	def notify_failure(self, xorrequesttuple):
@@ -336,7 +336,7 @@ class RandomXORRequestor:
 			InsufficientMirrors if there are not enough mirrors
 
 			An internal error is raised if the XORrequesttuple is bogus
- 
+
 		<Returns>
 			None
 
@@ -351,13 +351,13 @@ class RandomXORRequestor:
 				raise InsufficientMirrors("There are no replacement mirrors")
 
 			nextmirrorinfo = self.backupmirrorinfolist.pop(0)
-		
+
 			failedmirrorsinfo = xorrequesttuple[0]
-		
+
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
-			
+
 					# let's mark it as inactive and set up a different mirror
 					activemirrorinfo['mirrorinfo'] = nextmirrorinfo
 					activemirrorinfo['servingrequest'] = False
@@ -368,7 +368,7 @@ class RandomXORRequestor:
 		finally:
 			# release the lock
 			self.tablelock.release()
-		
+
 
 
 
@@ -383,9 +383,9 @@ class RandomXORRequestor:
 			xorblock: the data returned by the mirror
 
 		<Exceptions>
-			Assertions / IndexError / TypeError / InternalError if the 
+			Assertions / IndexError / TypeError / InternalError if the
 			XORrequesttuple is bogus
- 
+
 		<Returns>
 			None
 
@@ -395,14 +395,14 @@ class RandomXORRequestor:
 		self.tablelock.acquire()
 		#... but always release it
 		try:
-		
+
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
-				
-					
+
+
 					# remove the block and bitstring (asserting they match what we said before)
-					blocknumber = activemirrorinfo['blocksrequested'].pop(0) 
+					blocknumber = activemirrorinfo['blocksrequested'].pop(0)
 
 					# add the xorblockinfo to the dict
 					self.returnedxorblocksdict[blocknumber].append(xorblock)
@@ -422,11 +422,11 @@ class RandomXORRequestor:
 
 					# otherwise, let's put this in the finishedblockdict
 					self.finishedblockdict[blocknumber] = resultingblock
-					
+
 					# it should be safe to delete this
 					del self.returnedxorblocksdict[blocknumber]
 					return
-	
+
 			raise Exception("InternalError: Unknown mirror in notify_failure")
 
 		finally:
@@ -434,9 +434,9 @@ class RandomXORRequestor:
 			self.tablelock.release()
 
 
-		
 
-		
+
+
 	def return_block(self, blocknum):
 		"""
 		<Purpose>
@@ -447,14 +447,14 @@ class RandomXORRequestor:
 
 		<Exceptions>
 			KeyError if the block isn't known
- 
+
 		<Returns>
 			The block
 
 		"""
 
 		return self.finishedblockdict[blocknum]
-		
+
 
 
 ######################################################################
@@ -464,7 +464,7 @@ class RandomXORRequestor:
 class RandomXORRequestorChunks:
 
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, pollinginterval = .1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, pollinginterval=.1):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
@@ -518,25 +518,25 @@ class RandomXORRequestorChunks:
 				thisrequestinfo['parallelblocksneeded'] = []
 
 			thisrequestinfo['blockchunklist'] = []
-			
+
 
 			# chunk numbers [0, ..., r-1]
 			thisrequestinfo['chunknumbers'] = [i]
 			for j in xrange(1, redundancy):
 				thisrequestinfo['chunknumbers'].append((i+j) % privacythreshold)
 			i = i + 1
-			
+
 			#open a socket once:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
-			
+
 			if rng:
 				#pick a random seed (key) and initialize AES
 				seed = _randomnumberfunction(16)
 				thisrequestinfo['seed'] = seed
 				thisrequestinfo['cipher'] = raidpirlib.initAES(seed)
-			
-			
+
+
 			self.activemirrorinfolist.append(thisrequestinfo)
 
 		for thisrequestinfo in self.activemirrorinfolist:
@@ -550,16 +550,16 @@ class RandomXORRequestorChunks:
 			if rng:
 				params['s'] = thisrequestinfo['seed']
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
-			
+
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args = [thisrequestinfo, self], name = ("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
 			thisrequestinfo['rt'] = t
 			t.start()
 
-		
+
 		#multi block query. map the blocks to the minimum amount of queries
 		if parallel:
-			
+
 			#create dictionary for each chunk, will hold block indices per chunk
 			blockchunks = {}
 			for i in range(0, privacythreshold):
@@ -573,7 +573,7 @@ class RandomXORRequestorChunks:
 			#remove chunks that are still empty
 			for i in range(0, privacythreshold):
 				if len(blockchunks[i]) == 0:
-					del blockchunks[i]	
+					del blockchunks[i]
 
 			#do until all blocks are in queries
 			while len(blockchunks)>0:
@@ -581,12 +581,12 @@ class RandomXORRequestorChunks:
 				#iterate through mirrors
 				for thisrequestinfo in self.activemirrorinfolist:
 
-					#dicitonary of chunk requests										
+					#dicitonary of chunk requests
 					chunks = {}
 
 					#iterate through r-1 random chunks, skipping the head (flip) chunk
 					for c in thisrequestinfo['chunknumbers'][1:]:
-						
+
 						#pick correct length in bits
 						if c == self.privacythreshold - 1:
 							length = self.lastchunklen
@@ -611,8 +611,8 @@ class RandomXORRequestorChunks:
 
 					#number of the first chunk
 					c = thisrequestinfo['chunknumbers'][0]
-					
-					#pick correct length for the chunk	
+
+					#pick correct length for the chunk
 					if c == self.privacythreshold - 1:
 						length = self.lastchunklen
 					else:
@@ -635,25 +635,25 @@ class RandomXORRequestorChunks:
 						blocks.append(blocknum)
 						if len(blockchunks[c]) == 0:
 							del blockchunks[c]
-					
+
 					thisrequestinfo['parallelblocksneeded'].append(blocks)
 					thisrequestinfo['blockchunklist'][-1][c] = thisbitstring
 
 
 		#single block query:
-		else:	
+		else:
 			#iterate through all blocks
 			for blocknum in blocklist:
 
 
 				#iterate through mirrors
 				for thisrequestinfo in self.activemirrorinfolist:
-										
+
 					chunks = {}
 
 					#iterate through r-1 random chunks
 					for c in thisrequestinfo['chunknumbers'][1:]:
-						
+
 						#pick correct length in bits
 						if c == self.privacythreshold - 1:
 							length = self.lastchunklen
@@ -669,14 +669,14 @@ class RandomXORRequestorChunks:
 
 					thisrequestinfo['blockchunklist'].append(chunks)
 
-				
+
 				# now derive the first chunks
 				for thisrequestinfo in self.activemirrorinfolist:
 
 					#number of the first chunk
 					c = thisrequestinfo['chunknumbers'][0]
-					
-					#pick correct length for the chunk	
+
+					#pick correct length for the chunk
 					if c == self.privacythreshold - 1:
 						length = self.lastchunklen
 					else:
@@ -695,7 +695,7 @@ class RandomXORRequestorChunks:
 					#if the desired block is within this chunk, flip the bit
 					if c*self.chunklen <= blocknum and blocknum < c*self.chunklen + length:
 						thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocknum - c*self.chunklen)
-						
+
 					thisrequestinfo['blockchunklist'][-1][c] = thisbitstring
 
 
@@ -703,17 +703,17 @@ class RandomXORRequestorChunks:
 
 		# want to have a structure for locking
 		self.tablelock = threading.Lock()
-					
+
 
 		# and we'll keep track of the ones that are waiting in the wings...
 		self.backupmirrorinfolist = self.fullmirrorinfolist[self.privacythreshold:]
 
 		# the returned blocks are put here...
-		self.returnedxorblocksdict = {} 
+		self.returnedxorblocksdict = {}
 		for blocknum in blocklist:
 			# make these all empty lists to start with
 			self.returnedxorblocksdict[blocknum] = []
-		
+
 		# and here is where they are put when reconstructed
 		self.finishedblockdict = {}
 
@@ -737,7 +737,7 @@ class RandomXORRequestorChunks:
 
 		<Exceptions>
 			InsufficientMirrors if there are not enough mirrors
- 
+
 		<Returns>
 			Either a requesttuple (mirrorinfo, blocknumber, bitstring) or ()
 			when all strings have been retrieved...
@@ -748,9 +748,9 @@ class RandomXORRequestorChunks:
 		#   1) nothing that still needs to be requested -> return ()
 		#   2) requests remain, but all mirrors are busy -> block until ready
 		#   3) there is a request ready -> return the tuple
-		# 
+		#
 
-		# I'll exit via return.   I will loop to sleep while waiting.   
+		# I'll exit via return.   I will loop to sleep while waiting.
 		# I could use a condition variable here, but this should be fine.   There
 		# should almost always be < 5 threads.   Also, why would we start more
 		# threads than there are mirrors we will contact?   (As such, sleeping
@@ -762,13 +762,13 @@ class RandomXORRequestorChunks:
 			# but always release it
 			try:
 				for requestinfo in self.activemirrorinfolist:
-	
-				
+
+
 					# if this mirror is serving a request, skip it...
 # 					if requestinfo['servingrequest']:
 # 						stillserving = True
 # 						continue
-					
+
 
 					if self.parallel:
 						if len(requestinfo['parallelblocksneeded']) == 0:
@@ -785,11 +785,11 @@ class RandomXORRequestorChunks:
 							raise Exception("Parallel Query without RNG not yet implemented!") #TODO
 
 					#single block
-					else: 
+					else:
 						# this mirror is done...
 						if len(requestinfo['blocksneeded']) == 0:
 							continue
-				
+
 						# otherwise set it to be taken...
 						requestinfo['servingrequest'] = True
 
@@ -809,7 +809,7 @@ class RandomXORRequestorChunks:
 
 			# otherwise, I've looked an nothing is ready...   I'll sleep and retry
 			time.sleep(self.pollinginterval)
-	
+
 
 
 
@@ -826,7 +826,7 @@ class RandomXORRequestorChunks:
 			InsufficientMirrors if there are not enough mirrors
 
 			An internal error is raised if the XORrequesttuple is bogus
- 
+
 		<Returns>
 			None
 
@@ -841,13 +841,13 @@ class RandomXORRequestorChunks:
 				raise InsufficientMirrors("There are no replacement mirrors")
 
 			nextmirrorinfo = self.backupmirrorinfolist.pop(0)
-		
+
 			failedmirrorsinfo = xorrequesttuple[0]
-		
+
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
-			
+
 					# let's mark it as inactive and set up a different mirror
 					activemirrorinfo['mirrorinfo'] = nextmirrorinfo
 					activemirrorinfo['servingrequest'] = False
@@ -858,7 +858,7 @@ class RandomXORRequestorChunks:
 		finally:
 			# release the lock
 			self.tablelock.release()
-		
+
 
 
 
@@ -873,9 +873,9 @@ class RandomXORRequestorChunks:
 			xorblock: the data returned by the mirror
 
 		<Exceptions>
-			Assertions / IndexError / TypeError / InternalError if the 
+			Assertions / IndexError / TypeError / InternalError if the
 			XORrequesttuple is bogus
- 
+
 		<Returns>
 			None
 
@@ -885,7 +885,7 @@ class RandomXORRequestorChunks:
 		self.tablelock.acquire()
 
 		try:
-		
+
 			# now, let's find the activemirror this corresponds ro.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
@@ -893,7 +893,7 @@ class RandomXORRequestorChunks:
 					if self.parallel:
 						#use blocknumbers[0] as index from now on
 						blocknumbers = activemirrorinfo['blocksrequested'].pop(0)
-		
+
 						# add the xorblocks to the dict
 						self.returnedxorblocksdict[blocknumbers[0]].append(msgpack.unpackb(xorblock))
 
@@ -908,7 +908,7 @@ class RandomXORRequestorChunks:
 
 						#parse resultingblocks into single blocks
 
-				
+
 						for blocknumber in blocknumbers:
 
 							index = min(blocknumber/self.chunklen, self.privacythreshold-1)
@@ -921,9 +921,9 @@ class RandomXORRequestorChunks:
 								raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt, for blocknumber ' + str(blocknumber))
 
 							# otherwise, let's put this in the finishedblockdict
-							self.finishedblockdict[blocknumber] = resultingblockdict[index] 
-		
-						
+							self.finishedblockdict[blocknumber] = resultingblockdict[index]
+
+
 						# it should be safe to delete this
 						del self.returnedxorblocksdict[blocknumbers[0]]
 
@@ -934,7 +934,7 @@ class RandomXORRequestorChunks:
 					else:
 					# remove the block and bitstring (asserting they match what we said before)
 						blocknumber = activemirrorinfo['blocksrequested'].pop(0)
-		
+
 						# add the xorblock to the dict
 						self.returnedxorblocksdict[blocknumber].append(xorblock)
 
@@ -954,18 +954,18 @@ class RandomXORRequestorChunks:
 
 						# otherwise, let's put this in the finishedblockdict
 						self.finishedblockdict[blocknumber] = resultingblock
-						
+
 						# it should be safe to delete this
 						del self.returnedxorblocksdict[blocknumber]
 						return
-	
+
 			raise Exception("InternalError: Unknown mirror in notify_failure")
 
 		finally:
 			# release the lock
 			self.tablelock.release()
 
-	
+
 	def return_block(self, blocknum):
 		"""
 		<Purpose>
@@ -976,10 +976,9 @@ class RandomXORRequestorChunks:
 
 		<Exceptions>
 			KeyError if the block isn't known
- 
+
 		<Returns>
 			The block
 
 		"""
 		return self.finishedblockdict[blocknum]
-		

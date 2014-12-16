@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Justin Cappos
 	(inspired from a previous version by Geremy Condra)
@@ -8,7 +8,7 @@
 
 <Description>
 	Library code that emulates the upPIR XORdatastore.   This is likely to only
-	be used for testing.   There will be a C version that will be much, much 
+	be used for testing.   There will be a C version that will be much, much
 	faster
 
 """
@@ -26,13 +26,13 @@ def do_xor(string_a, string_b):
 
 	<Arguments>
 		string_a, string_b: the strings to XOR
-	
-	<Exceptions>    
-		ValueError if the strings are of unequal lengths 
+
+	<Exceptions>
+		ValueError if the strings are of unequal lengths
 		TypeError if the strings are not strings
 
 	<Returns>
-		The XORed result.   
+		The XORed result.
 	"""
 	if type(string_a) != str or type(string_b) != str:
 		raise TypeError("do_xor called with a non-string")
@@ -53,13 +53,13 @@ def do_xor_blocks(string_a, string_b):
 
 	<Arguments>
 		string_a, string_b: the strings to XOR, both equal length, multiple of 64 bit
-	
-	<Exceptions>    
-		ValueError if the strings are of unequal lengths 
+
+	<Exceptions>
+		ValueError if the strings are of unequal lengths
 		TypeError if the strings are not strings
 
 	<Returns>
-		The XORed result.   
+		The XORed result.
 	"""
 	if type(string_a) != str or type(string_b) != str:
 		raise TypeError("do_xor called with a non-string")
@@ -80,16 +80,16 @@ def do_xor_old(string_a, string_b):
 
 	<Arguments>
 		string_a, string_b: the strings to XOR
-	
+
 	<Side Effects>
 		None
 
-	<Exceptions>    
-		ValueError if the strings are of unequal lengths 
+	<Exceptions>
+		ValueError if the strings are of unequal lengths
 		TypeError if the strings are not strings
 
 	<Returns>
-		The XORed result.   
+		The XORed result.
 	"""
 	if type(string_a) != str or type(string_b) != str:
 		raise TypeError("do_xor called with a non-string")
@@ -110,7 +110,7 @@ class XORDatastore:
 	"""
 	<Purpose>
 		Class that has information for an XORdatastore.   This data structure can
-		quickly XOR blocks of data that it stores.   
+		quickly XOR blocks of data that it stores.
 
 	<Side Effects>
 		None.
@@ -123,15 +123,15 @@ class XORDatastore:
 		startpos = 0
 		for char in range(ord("A"), ord("Q")):
 			# put 1K of those chars in...
-			letterxordatastore.set_data(startpos, chr(char) * 1024) 
+			letterxordatastore.set_data(startpos, chr(char) * 1024)
 			startpos = startpos + 1024
 
 		# can read data out...
 		print letterxordatastore.get_data(2000, 1)
 		# Should print 'B' as this is the 1 thousandth letter...
 
-		# let's create a bitstring that uses A, C, and P.   
-		bitstring = chr(int('10100000', 2)) + chr(int('00000001',2))
+		# let's create a bitstring that uses A, C, and P.
+		bitstring = chr(int('10100000', 2)) + chr(int('00000001', 2))
 		xorresult = letterxordatastore.produce_xor_from_bitstring(bitstring)
 
 		print xorresult[0]
@@ -143,19 +143,19 @@ class XORDatastore:
 	_blocks = []
 
 	# these are public so that a caller can read information about a created
-	# datastore.   They should not be changed.   
+	# datastore.   They should not be changed.
 	numberofblocks = None
 	sizeofblocks = None
 
 	def __init__(self, block_size, num_blocks):  # allocate
 		"""
 		<Purpose>
-			Allocate a place to store data for efficient XOR.   
+			Allocate a place to store data for efficient XOR.
 
 		<Arguments>
 			block_size: the size of each block.   This must be a positive int / long.
 									The value must be a multiple of 64
-			
+
 			num_blocks: the number of blocks.   This must be a positive integer
 
 		<Exceptions>
@@ -188,7 +188,7 @@ class XORDatastore:
 		for _ in range(self.numberofblocks):
 			self._blocks.append(chr(0) * self.sizeofblocks)
 
-		
+
 
 	def produce_xor_from_bitstring(self, bitstring):
 		"""
@@ -201,7 +201,7 @@ class XORDatastore:
 								 of this string must be ceil(numberofblocks / 8.0).   Extra
 								 bits are ignored (e.g. if are 10 blocks, the last
 								 six bits are ignored).
-			
+
 		<Exceptions>
 			TypeError is raised if the bitstring is invalid
 
@@ -217,7 +217,7 @@ class XORDatastore:
 
 		# start with an empty string of the right size...
 		currentblock = chr(0) * self.sizeofblocks
-		
+
 		# This is the block we are looking at now
 		currentblocknumber = 0
 
@@ -227,10 +227,10 @@ class XORDatastore:
 
 				# find the value we need to & the data with.
 				bitvalue = 2 ** (7 - bitnumber)
-				
+
 				# If it's a one...
 				if ord(thisbyte) & bitvalue:
-		
+
 					# ... and we're not past the end of the string...
 					if currentblocknumber < self.numberofblocks:
 						# ... do the xor
@@ -241,7 +241,7 @@ class XORDatastore:
 
 		# let's return the result!
 		return currentblock
-			
+
 
 
 
@@ -251,12 +251,12 @@ class XORDatastore:
 			Sets the raw data in an XORdatastore.   It ignores block layout, etc.
 
 		<Arguments>
-			offset: this is a non-negative integer that must be less than the 
-							numberofblocks * blocksize.   
-			
+			offset: this is a non-negative integer that must be less than the
+							numberofblocks * blocksize.
+
 			data_to_add: the string that should be added.   offset + len(data_to_add)
 								must be less than the numberofblocks * blocksize.
-			
+
 		<Exceptions>
 			TypeError if the arguments are the wrong type or have invalid values.
 
@@ -278,8 +278,8 @@ class XORDatastore:
 
 		(startblock, startoffset) = self._find_blockloc_from_offset(offset)
 		(endblock, endoffset) = self._find_blockloc_from_offset(offset + len(data_to_add))
-		
-		# Case 1: this does not cross blocks 
+
+		# Case 1: this does not cross blocks
 		if startblock == endblock:
 
 			# insert the string into the block...
@@ -295,13 +295,13 @@ class XORDatastore:
 		# now add in the 'middle' blocks.   This is all of the blocks after the start and before the end
 		for currentblock in range(startblock + 1, endblock):
 			self._blocks[currentblock] = data_to_add[amountadded:amountadded + self.sizeofblocks]
-			amountadded = amountadded + self.sizeofblocks 
+			amountadded = amountadded + self.sizeofblocks
 
 
 		# finally, add the end block.   Add everything left over and pad with the previous block data.
 		if endoffset > 0:
 			self._blocks[endblock] = data_to_add[amountadded:] + self._blocks[endblock][len(data_to_add) - amountadded:]
-		
+
 
 
 
@@ -312,12 +312,12 @@ class XORDatastore:
 			Returns raw data from an XORdatastore.   It ignores block layout, etc.
 
 		<Arguments>
-			offset: this is a non-negative integer that must be less than the 
-							numberofblocks * blocksize.   
-			
-			quantity: quantity must be a positive integer.   offset + quantity 
+			offset: this is a non-negative integer that must be less than the
+							numberofblocks * blocksize.
+
+			quantity: quantity must be a positive integer.   offset + quantity
 								must be less than the numberofblocks * blocksize.
-			
+
 		<Exceptions>
 			TypeError if the arguments are the wrong type or have invalid values.
 
@@ -341,7 +341,7 @@ class XORDatastore:
 			raise TypeError("Quantity + offset is larger than XORdatastore")
 
 
-		# Let's get the block information 
+		# Let's get the block information
 		(startblock, startoffset) = self._find_blockloc_from_offset(offset)
 		(endblock, endoffset) = self._find_blockloc_from_offset(offset + quantity)
 
@@ -354,16 +354,16 @@ class XORDatastore:
 		# we'll build up the string starting with the first block...
 		currentstring = self._blocks[startblock][startoffset:]
 
-		# now add in the 'middle' blocks.   This is all of the blocks 
+		# now add in the 'middle' blocks.   This is all of the blocks
 		# after the start and before the end
 		for currentblock in range(startblock + 1, endblock):
 			currentstring += self._blocks[currentblock]
 
 		# this check is needed because we might be past the last block.
 		if endoffset > 0:
-			# finally, add the end block. 
+			# finally, add the end block.
 			currentstring += self._blocks[endblock][:endoffset]
-		
+
 		# and return the result
 		return currentstring
 
@@ -371,8 +371,8 @@ class XORDatastore:
 
 	def _find_blockloc_from_offset(self, offset):
 		# Private helper function that translates an offset into (block, offset)
-		assert(offset >= 0)
-		assert(offset <= self.numberofblocks * self.sizeofblocks)
+		assert offset >= 0
+		assert offset <= self.numberofblocks * self.sizeofblocks
 
 		return (offset / self.sizeofblocks, offset % self.sizeofblocks)
 

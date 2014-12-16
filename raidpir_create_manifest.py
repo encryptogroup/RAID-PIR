@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Daniel Demmler
 	(inspired from upPIR by Justin Cappos)
@@ -19,7 +19,7 @@
 	a mirror. A setting of 1MB will work well for most applications. However,
 	for more information about tuning this, please see the website.
 
-	
+
 
 <Usage>
 	$ python raidpir_create_manifest.py vendorroot blocksize vendorhostname
@@ -32,7 +32,7 @@ See below
 """
 
 # This file is laid out in two main parts.   First, we parse the command line
-# options using parse_options(). Next, we generate the mainfest in the 
+# options using parse_options(). Next, we generate the mainfest in the
 # main part (not in a function).
 #
 # EXTENSION POINTS:
@@ -44,7 +44,7 @@ See below
 #
 # The manifest file could also be extended to support huge files (those that
 # span multiple releases).   This would primarily require client changes, but
-# it may be useful to add metadata to the manifest to further indicate 
+# it may be useful to add metadata to the manifest to further indicate
 # information about how to stitch these files back together.
 
 
@@ -61,7 +61,7 @@ if sys.version_info[0] != 2 or sys.version_info[1] != 7:
 
 import msgpack
 
-# This says which function corresponds to an option 
+# This says which function corresponds to an option
 _offsetoptionname_to_functionmap = {'nogaps':raidpirlib.nogaps_offset_assignment_function}
 
 
@@ -74,7 +74,7 @@ def parse_options():
 
 	<Arguments>
 		None
-	
+
 	<Side Effects>
 		None
 
@@ -90,20 +90,20 @@ def parse_options():
 
 	parser = optparse.OptionParser()
 
-	parser.add_option("-m","--manifestfile", dest="manifestfile", type="string", 
-				metavar="manifestfile", default="manifest.dat", 
+	parser.add_option("-m", "--manifestfile", dest="manifestfile", type="string",
+				metavar="manifestfile", default="manifest.dat",
 				help="Use this name for the manifest file (default manifest.dat)")
 
-	parser.add_option("-p","--vendorport", dest="vendorport", type="int", 
+	parser.add_option("-p", "--vendorport", dest="vendorport", type="int",
 				metavar="port", default=62293,
 				help="The vendor will listen on this port (default 62293)")
 
 
-	parser.add_option("-H","--hashalgorithm", dest="hashalgorithm", type="string", 
-				metavar="algorithm", default="sha256-raw", 
+	parser.add_option("-H", "--hashalgorithm", dest="hashalgorithm", type="string",
+				metavar="algorithm", default="sha256-raw",
 				help="Chooses which algorithm to use for the secure hash (default sha256-raw)")
 
-	parser.add_option("-o","--offsetalgorithm", dest="offsetalgorithm", 
+	parser.add_option("-o", "--offsetalgorithm", dest="offsetalgorithm",
 				type="string", metavar="algorithm", default="nogaps",
 				help="Chooses how to put the files into blocks (default is nogaps). Currently only nogaps is supported.")
 
@@ -114,10 +114,10 @@ def parse_options():
 
 	# check the arguments
 	if commandlineoptions.offsetalgorithm not in _offsetoptionname_to_functionmap:
-		print "Unknown offsetalgorithm, try one of:",_offsetoptionname_to_functionmap.keys()
+		print "Unknown offsetalgorithm, try one of:", _offsetoptionname_to_functionmap.keys()
 		sys.exit(1)
 
-	# replace the string with a function reference.   
+	# replace the string with a function reference.
 	# JAC: Stylistically, I don't like this, but I don't know an easy way
 	# to improve it.
 	commandlineoptions.offsetalgorithm = _offsetoptionname_to_functionmap[commandlineoptions.offsetalgorithm]
@@ -133,7 +133,7 @@ def parse_options():
 
 	commandlineoptions.vendorhostname = remainingargs[2]
 
-	if commandlineoptions.blocksize <=0:
+	if commandlineoptions.blocksize <= 0:
 		print "Specified blocksize number is not positive"
 		sys.exit(1)
 
@@ -141,7 +141,7 @@ def parse_options():
 		print "Blocksize must be divisible by 64"
 		sys.exit(1)
 
-	if commandlineoptions.vendorport <=0 or commandlineoptions.vendorport > 65535:
+	if commandlineoptions.vendorport <= 0 or commandlineoptions.vendorport > 65535:
 		print "Invalid vendorport"
 		sys.exit(1)
 
@@ -155,22 +155,22 @@ if __name__ == '__main__':
 	print "RAID-PIR create manifest", raidpirlib.pirversion
 	# parse user provided data
 	commandlineoptions = parse_options()
-	
+
 	# create the dict
-	manifestdict = raidpirlib.create_manifest(rootdir=commandlineoptions.rootdir, 
-				hashalgorithm=commandlineoptions.hashalgorithm, 
-				block_size=commandlineoptions.blocksize, 
+	manifestdict = raidpirlib.create_manifest(rootdir=commandlineoptions.rootdir,
+				hashalgorithm=commandlineoptions.hashalgorithm,
+				block_size=commandlineoptions.blocksize,
 				offset_assignment_function=commandlineoptions.offsetalgorithm,
 				vendorhostname=commandlineoptions.vendorhostname,
 				vendorport=commandlineoptions.vendorport)
 
 	# open the destination file
-	manifestfo = open(commandlineoptions.manifestfile,'w')
+	manifestfo = open(commandlineoptions.manifestfile, 'w')
 
 	# and write it in a safely serialized format (msgpack).
 	rawmanifest = msgpack.packb(manifestdict)
 	manifestfo.write(rawmanifest)
-	
+
 	manifestfo.close()
 
 	print "Generated", commandlineoptions.manifestfile, "describing xordatastore with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.'

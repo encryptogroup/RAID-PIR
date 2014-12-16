@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Daniel Demmler
 	(inspired from upPIR by Justin Cappos)
@@ -8,15 +8,15 @@
 	December 2014
 
 <Description>
-	Mirror code that serves RAID-PIR files.   A client obtains a list of live 
+	Mirror code that serves RAID-PIR files.   A client obtains a list of live
 	mirrors from a vendor.   The client then sends bit strings to the mirror and
 	the mirror returns XORed blocks of data.   The mirror will periodically
-	announce its liveness to the vendor it is serving content for.   
+	announce its liveness to the vendor it is serving content for.
 
 	The files specified in the manifest must already exist on the local machine.
 
 	For more technical explanation, please see the paper.
-	
+
 
 <Options>
 	See below...
@@ -33,7 +33,7 @@
 # EXTENSION POINTS:
 #
 # One can define new xordatastore types (although I need a more explicit plugin
-# module).   These could include memoization and other optimizations to 
+# module).   These could include memoization and other optimizations to
 # further improve the speed of XOR processing.
 #
 
@@ -108,15 +108,15 @@ def _send_mirrorinfo():
 	if _commandlineoptions.vendorip == None:
 		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _global_manifestdict['vendorhostname'], _global_manifestdict['vendorport'])
 	else:
-		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport']) 
-	
+		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport'])
+
 
 ############################### Serve via RAID-PIR ###############################
 
 
 # I don't need to change this much, I think...
-class ThreadedXORServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer): 
-	allow_reuse_address=True
+class ThreadedXORServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+	allow_reuse_address = True
 
 
 class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
@@ -129,165 +129,165 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		global chunklen
 		global lastchunklen
 		global cipher
-		
+
 		requeststring = '0'
 
-		while(requeststring!='Q'):
+		while requeststring != 'Q':
 			# read the request from the socket...
 			requeststring = session.recvmessage(self.request)
-	
+
 			# for logging purposes, get the remote info
-			remoteip, remoteport = self.request.getpeername()
-	
+			# remoteip, remoteport = self.request.getpeername()
+
 			# if it's a request for a XORBLOCK
 			if requeststring.startswith('X'):
-	
+
 				bitstring = requeststring[len('X'):]
-		
+
 				expectedbitstringlength = raidpirlib.compute_bitstring_length(_global_myxordatastore.numberofblocks)
-	
+
 				if len(bitstring) != expectedbitstringlength:
 					# Invalid request length...
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request with length: "+str(len(bitstring)))
-	
+
 					session.sendmessage(self.request, 'Invalid request length')
 					return
-		
+
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-		
+
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-	
-	
+
+
 				# done!
 				#return
-	
+
 			elif requeststring.startswith('C'):
-	
+
 				payload = requeststring[len('C'):]
-	
+
 				chunks = msgpack.unpackb(payload)
-	
-				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) 
-	
+
+				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen)
+
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-	
+
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-	
-	
+
+
 				#done!
 				#return
-	
+
 			elif requeststring.startswith('R'):
-	
+
 				payload = requeststring[len('R'):]
-	
+
 				chunks = msgpack.unpackb(payload)
-	
-	
+
+
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
-					
+
 					if c == k - 1:
 						length = lastchunklen
 					else:
 						length = chunklen
-	
+
 					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
-	
-	
+
+
 				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
-	
+
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
-	
+
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-	
+
 				#done!
 				#return
-	
-			elif requeststring.startswith('M'): 
-	
+
+			elif requeststring.startswith('M'):
+
 				payload = requeststring[len('M'):]
-	
+
 				chunks = msgpack.unpackb(payload)
-		
+
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
-					
+
 					if c == k - 1:
 						length = lastchunklen
 					else:
 						length = chunklen
-	
+
 					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
-	
-	
+
+
 				bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
-	
+
 				result = {}
 				for c in chunknumbers:
 					result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
-	
+
 				# and send the reply.
 				session.sendmessage(self.request, msgpack.packb(result))
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-	
-	
+
+
 				#done!
 				#return
-	
+
 			elif requeststring.startswith('P'):
-	
+
 				payload = requeststring[len('P'):]
-	
+
 				params = msgpack.unpackb(payload)
-	
+
 				chunknumbers = params['cn']
-				k  = params['k']
+				k = params['k']
 				r = params['r']
 				chunklen = params['cl']
 				lastchunklen = params['lcl']
-				
+
 				if 's' in params:
 					cipher = raidpirlib.initAES(params['s'])
-	
+
 				# and send the reply.
 				session.sendmessage(self.request, "PARAMS OK")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
-	
+
 				#done!
 				#return
-	
+
 			elif requeststring == 'HELLO':
 				# send a reply.
 				session.sendmessage(self.request, "HI!")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
-	
+
 				# done!
 				#return
-			
+
 			#the client asked to close the connection
 			elif requeststring == 'Q':
 				return
-			
-			#this happens if the client closed the socket unexpectedly	
-			elif requeststring =='':
+
+			#this happens if the client closed the socket unexpectedly
+			elif requeststring == '':
 				return
-	
+
 			else:
 				# we don't know what this is!   Log and tell the requestor
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request type starts:'"+requeststring[:5]+"'")
-	
+
 				session.sendmessage(self.request, 'Invalid request type')
-				
+
 				return
 
 
@@ -296,11 +296,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 def service_raidpir_clients(myxordatastore, ip, port):
 
 	# this should be done before we are called
-	assert(_global_myxordatastore != None)
+	assert _global_myxordatastore != None
 
 	# create the handler / server
 	xorserver = ThreadedXORServer((ip, port), ThreadedXORRequestHandler)
-	
+
 
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server").start()
@@ -334,14 +334,14 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				self.end_headers()
 
 				# and send the response!
-				filedata = _global_myxordatastore.get_data(fileinfo['offset'],fileinfo['length'])
+				filedata = _global_myxordatastore.get_data(fileinfo['offset'], fileinfo['length'])
 				self.wfile.write(filedata)
 				return
 
 		# otherwise, it's unknown...
 		self.send_error(404)
 		return
-		
+
 	# log HTTP information
 	def log_message(self, format, *args):
 		pass
@@ -351,10 +351,10 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 
 def service_http_clients(myxordatastore, manifestdict, ip, port):
-	
+
 	# this must have already been set
-	assert(_global_myxordatastore != None)
-	assert(_global_manifestdict != None)
+	assert _global_myxordatastore != None
+	assert _global_manifestdict != None
 
 	httpserver = BaseHTTPServer.HTTPServer((ip, port), MyHTTPRequestHandler)
 
@@ -368,7 +368,7 @@ def service_http_clients(myxordatastore, manifestdict, ip, port):
 _commandlineoptions = None
 
 def parse_options():
-	"""	
+	"""
 	<Side Effects>
 		All relevant data is added to _commandlineoptions
 
@@ -384,47 +384,47 @@ def parse_options():
 	global _logfo
 
 	# should be true unless we're initing twice...
-	assert(_commandlineoptions==None)
+	assert _commandlineoptions == None
 
 	parser = optparse.OptionParser()
 
-	parser.add_option("","--ip", dest="ip", type="string", metavar="IP", 
+	parser.add_option("", "--ip", dest="ip", type="string", metavar="IP",
 				default=getmyip.getmyip(), help="Listen for clients on the following IP (default is the public facing IP)")
 
-	parser.add_option("","--port", dest="port", type="int", metavar="portnum", 
+	parser.add_option("", "--port", dest="port", type="int", metavar="portnum",
 				default=62294, help="Use the following port to serve RAID-PIR clients (default 62294)")
 
-	parser.add_option("","--http", dest="http", action="store_true", 
+	parser.add_option("", "--http", dest="http", action="store_true",
 				default=False, help="Serve legacy clients via HTTP (default False)")
 
-	parser.add_option("","--httpport", dest="httpport", type="int",
+	parser.add_option("", "--httpport", dest="httpport", type="int",
 				default=80, help="Serve HTTP clients on this port (default 80)")
 
-	parser.add_option("","--mirrorroot", dest="mirrorroot", type="string", 
-				metavar="dir", default=".", 
+	parser.add_option("", "--mirrorroot", dest="mirrorroot", type="string",
+				metavar="dir", default=".",
 				help="The base directory where all mirror files are located.")
 
-	parser.add_option("","--retrievemanifestfrom", dest="retrievemanifestfrom", 
+	parser.add_option("", "--retrievemanifestfrom", dest="retrievemanifestfrom",
 				type="string", metavar="vendorIP:port", default="",
 				help="Specifies the vendor to retrieve the manifest from (default None).")
 
-	parser.add_option("-m","--manifestfile", dest="manifestfilename", 
+	parser.add_option("-m", "--manifestfile", dest="manifestfilename",
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
-	parser.add_option("","--foreground", dest="daemonize", action="store_false",
+	parser.add_option("", "--foreground", dest="daemonize", action="store_false",
 				default=True,
 				help="Do not detach from the terminal and run in the background")
 
-	parser.add_option("","--logfile", dest="logfilename", 
+	parser.add_option("", "--logfile", dest="logfilename",
 				type="string", default="mirror.log",
 				help="The file to write log data to (default mirror.log).")
 
-	parser.add_option("","--announcedelay", dest="mirrorlistadvertisedelay",
+	parser.add_option("", "--announcedelay", dest="mirrorlistadvertisedelay",
 				type="int", default=60,
 				help="How many seconds should I wait between vendor notifications? (default 60).")
 
-	parser.add_option("","--vendorip", dest="vendorip", type="string", metavar="IP", 
+	parser.add_option("", "--vendorip", dest="vendorip", type="string", metavar="IP",
 				default=None, help="Vendor IP for overwriting the value from manifest")
 
 
@@ -446,7 +446,7 @@ def parse_options():
 		sys.exit(1)
 
 	if remainingargs:
-		print "Unknown options",remainingargs
+		print "Unknown options", remainingargs
 		sys.exit(1)
 
 	# try to open the log file...
@@ -457,7 +457,7 @@ def main():
 	global _global_myxordatastore
 	global _global_manifestdict
 
-	
+
 	# If we were asked to retrieve the mainfest file, do so...
 	if _commandlineoptions.retrievemanifestfrom:
 		# We need to download this file...
@@ -465,7 +465,7 @@ def main():
 
 		# ...make sure it is valid...
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
-		
+
 		# ...and write it out if it's okay
 		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
 
@@ -474,7 +474,7 @@ def main():
 		# Simply read it in from disk
 		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
-	
+
 	# We should detach here.   I don't do it earlier so that error
 	# messages are written to the terminal...   I don't do it later so that any
 	# threads don't exist already.   If I do put it much later, the code hangs...
@@ -484,8 +484,8 @@ def main():
 	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'])
 
 	# now let's put the content in the datastore in preparation to serve it
-	raidpirlib.populate_xordatastore(manifestdict, myxordatastore, rootdir = _commandlineoptions.mirrorroot)
-		
+	raidpirlib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.mirrorroot)
+
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')
 
@@ -501,7 +501,7 @@ def main():
 		service_http_clients(myxordatastore, manifestdict, _commandlineoptions.ip, _commandlineoptions.httpport)
 
 	#_log('servers started!')
-	print "Mirror Server started at" , _commandlineoptions.ip, ":", _commandlineoptions.port
+	print "Mirror Server started at", _commandlineoptions.ip, ":", _commandlineoptions.port
 
 	# let's send the mirror information periodically...
 	# we should log any errors...
@@ -521,9 +521,9 @@ if __name__ == '__main__':
 	try:
 		main()
 	except Exception, e:
-		# log errors to prevent silent exiting...   
-		print(str(type(e))+" "+str(e))
-		# this mess prints a not-so-nice traceback, but it does contain all 
+		# log errors to prevent silent exiting...
+		print str(type(e))+" "+str(e)
+		# this mess prints a not-so-nice traceback, but it does contain all
 		# relevant info
 		_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 		sys.exit(1)

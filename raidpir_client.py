@@ -1,4 +1,4 @@
-""" 
+"""
 <Author>
 	Daniel Demmler
 	(inspired from upPIR by Justin Cappos)
@@ -10,46 +10,46 @@
 <Description>
 	Client code for retrieving RAID-PIR files. This program uses a manifest
 	to communicate with a vendor and retrieve a list of mirrors.   The client
-	then _privately_ downloads the appropriate files from mirrors in the mirror 
+	then _privately_ downloads the appropriate files from mirrors in the mirror
 	list.  None of the mirrors can tell what file or files were downloaded.
 
 	For more technical explanation, please see the paper.
-	
+
 <Usage>
 	see python raidpir_client.py --help
-	
+
 	$ python raidpir_client.py [--retrievemanifestfrom <IP>:<PORT>] [-r <REDUNDANCY>] [-R] [-p] [--vendorip <IP>] file1 [file2 ...]
-	
+
 
 <Options>
 	See below
 """
 
 # This file is laid out in two main parts.   First, there are some helper
-# functions to do moderately complex things like retrieving a block from a 
+# functions to do moderately complex things like retrieving a block from a
 # mirror or split a file into blocks.   The second part contains the option
 # parsing and main.   To get an overall feel for the code, it is recommended
 # to follow the execution from main on.
 #
 # EXTENSION POINTS:
 #
-# Making the client extensible is a major problem.   In particular, we will 
-# need to modify mirror selection, block selection, malicious mirror detection, 
-# and avoiding slow nodes simultaneously.   To do this effectively, we need 
-# some sort of mechanism that gives the programmer control over how to handle 
+# Making the client extensible is a major problem.   In particular, we will
+# need to modify mirror selection, block selection, malicious mirror detection,
+# and avoiding slow nodes simultaneously.   To do this effectively, we need
+# some sort of mechanism that gives the programmer control over how to handle
 # these.
 #
 # The XORRequestor interface is used to address these issues.   A programmer
-# The programmer defines an object that is provided the manifest, 
-# mirrorlist, and blocks to retrieve.   The XORRequestor object must support 
-# several methods: get_next_xorrequest(), notify_failure(xorrequest), 
-# notify_success(xorrequest, xordata), and return_block(blocknum).   The 
-# request_blocks_from_mirrors function in this file will use threads to call 
-# these methods to determine what to retrieve.   The notify_* routines are 
-# used to inform the XORRequestor object of prior results so that it can 
+# The programmer defines an object that is provided the manifest,
+# mirrorlist, and blocks to retrieve.   The XORRequestor object must support
+# several methods: get_next_xorrequest(), notify_failure(xorrequest),
+# notify_success(xorrequest, xordata), and return_block(blocknum).   The
+# request_blocks_from_mirrors function in this file will use threads to call
+# these methods to determine what to retrieve.   The notify_* routines are
+# used to inform the XORRequestor object of prior results so that it can
 # decide how to issue future block requests.   This separates out the 'what'
-# from the 'how' but has a slight loss of control.  Note that the block 
-# reconstruction, etc. is done here to allow easy extensibility of malicious 
+# from the 'how' but has a slight loss of control.  Note that the block
+# reconstruction, etc. is done here to allow easy extensibility of malicious
 # mirror detection / vendor notification.
 #
 #
@@ -79,7 +79,7 @@ import os.path
 def _request_helper(rxgobj):
 	# Private helper to get requests. Multiple threads will execute this...
 	thisrequest = rxgobj.get_next_xorrequest()
-	
+
 	# go until there are no more requests
 	while thisrequest != ():
 		socket = thisrequest[0]['socket']
@@ -95,14 +95,14 @@ def _request_helper(rxgobj):
 				sys.stdout.flush()
 			else:
 				# otherwise, re-raise...
-				raise  
+				raise
 
 		#else:
 			# we retrieved it successfully...
 			#rxgobj.notify_success(thisrequest, xorblock)
 			#sys.stdout.write('.')
 			#sys.stdout.flush()
-		
+
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest()
 
@@ -112,7 +112,7 @@ def _request_helper(rxgobj):
 def _request_helper_chunked(rxgobj):
 	# Private helper to get requests. Potentially multiple threads will execute this...
 	thisrequest = rxgobj.get_next_xorrequest()
-	
+
 	# go until there are no more requests
 	while thisrequest != ():
 		socket = thisrequest[0]['socket']
@@ -138,21 +138,21 @@ def _request_helper_chunked(rxgobj):
 				sys.stdout.flush()
 			else:
 				# otherwise, re-raise...
-				raise  
+				raise
 
 		#else:
 			# we retrieved it successfully...
 			#rxgobj.notify_success(thisrequest, xorblock)
 			# sys.stdout.write('.')
 			# sys.stdout.flush()
-		
+
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest()
 
 	# and that's it!
 	return
 
-	
+
 def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rng, parallel):
 
 	"""
@@ -163,12 +163,12 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		requestedblocklist: the blocks to acquire
 
 		manifestdict: the manifest with information about the release
-	
+
 	<Side Effects>
 		Contacts mirrors to retrieve blocks.    It uses some global options
 
 	<Exceptions>
-		TypeError may be raised if the provided lists are invalid.   
+		TypeError may be raised if the provided lists are invalid.
 		socket errors may be raised if communications fail.
 
 	<Returns>
@@ -197,13 +197,13 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper, args=[rxgobj]).start()
 
 		_request_helper(rxgobj)
-		
+
 		# wait for receiving threads to finish
 		for mirror in rxgobj.activemirrorinfolist:
 			mirror['rt'].join()
-		
+
 		rxgobj.cleanup()
-	
+
 	else: # chunks
 
 		# let's set up a requestor object...
@@ -223,11 +223,11 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			threading.Thread(target=_request_helper_chunked, args=[rxgobj]).start()
 
 		_request_helper_chunked(rxgobj)
-		
+
 		# wait for receiving threads to finish
 		for mirror in rxgobj.activemirrorinfolist:
 			mirror['rt'].join()
-		
+
 		rxgobj.cleanup()
 
 
@@ -237,7 +237,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		retdict[blocknum] = rxgobj.return_block(blocknum)
 
 	return retdict
-	
+
 
 def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, manifestdict):
 	"""
@@ -250,18 +250,18 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 		rng: use rnd to generate latter chunks
 		parallel: query one block per chunk
 		manifestdict: the manifest with information about the release
-	
+
 	<Side Effects>
 		Contacts mirrors to retrieve files. They are written to disk
 
 	<Exceptions>
-		TypeError may be raised if the provided lists are invalid.   
+		TypeError may be raised if the provided lists are invalid.
 		socket errors may be raised if communications fail.
 
 	<Returns>
 		None
 	"""
-	
+
 	neededblocks = []
 	#print "Request Files:"
 	# let's figure out what blocks we need
@@ -273,14 +273,14 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 		for blocknum in theseblocks:
 			if blocknum not in neededblocks:
 				neededblocks.append(blocknum)
-	
-	# do the actual retrieval work 
+
+	# do the actual retrieval work
 	blockdict = request_blocks_from_mirrors(neededblocks, manifestdict, redundancy, rng, parallel)
 
 
 	# now we should write out the files
 	for filename in requestedfilelist:
-		filedata = raidpirlib.extract_file_from_blockdict(filename, manifestdict, blockdict)  
+		filedata = raidpirlib.extract_file_from_blockdict(filename, manifestdict, blockdict)
 
 		# let's check the hash
 		thisfilehash = raidpirlib.find_hash(filedata, manifestdict['hashalgorithm'])
@@ -299,7 +299,7 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 
 		# open the filename w/o the dir and write it
 		filenamewithoutpath = os.path.basename(filename)
-		open(filenamewithoutpath,"w").write(filedata)
+		open(filenamewithoutpath, "w").write(filedata)
 		print "wrote", filenamewithoutpath
 
 
@@ -313,7 +313,7 @@ def parse_options():
 
 	<Arguments>
 		None
-	
+
 	<Side Effects>
 		All relevant data is added to _commandlineoptions
 
@@ -328,40 +328,40 @@ def parse_options():
 	global _commandlineoptions
 
 	# should be true unless we're initing twice...
-	assert(_commandlineoptions==None)
+	assert _commandlineoptions == None
 
 	parser = optparse.OptionParser()
 
-	parser.add_option("","--retrievemanifestfrom", dest="retrievemanifestfrom", 
+	parser.add_option("", "--retrievemanifestfrom", dest="retrievemanifestfrom",
 				type="string", metavar="vendorIP:port", default="",
 				help="Specifies the vendor to retrieve the manifest from (default None).")
-	
-	parser.add_option("","--printfilenames", dest="printfiles", 
+
+	parser.add_option("", "--printfilenames", dest="printfiles",
 				action="store_true", default=False,
 				help="Print a list of all available files in the manifest file.")
 
-	parser.add_option("","--vendorip", dest="vendorip", type="string", metavar="IP", 
+	parser.add_option("", "--vendorip", dest="vendorip", type="string", metavar="IP",
 				default=None, help="Vendor IP for overwriting the value from manifest; for testing purposes.")
 
-	parser.add_option("-m","--manifestfile", dest="manifestfilename", 
+	parser.add_option("-m", "--manifestfile", dest="manifestfilename",
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
-	parser.add_option("-k","--numberofmirrors", dest="numberofmirrors",
+	parser.add_option("-k", "--numberofmirrors", dest="numberofmirrors",
 				type="int", default=2,
 				help="How many servers do we query? (default 2)")
-	
-	parser.add_option("-r","--redundancy", dest="redundancy",
+
+	parser.add_option("-r", "--redundancy", dest="redundancy",
 				type="int", default=None,
 				help="Activates chunks and specifies redundancy (how often they overlap). (default None)")
 
 	parser.add_option("-R", "--rng", action="store_true", dest="rng", default=False,
 				help="Use seed expansion from RNG for latter chunks (default False). Requires -r")
-					
+
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
 				help="Query one block per chunk in parallel (default False). Requires -r")
 
-	parser.add_option("-t","--numberofthreads", dest="numberofthreads",
+	parser.add_option("-t", "--numberofthreads", dest="numberofthreads",
 				type="int", default=None,
 				help="How many threads should concurrently contact servers? (default numberofmirrors)")
 
@@ -376,7 +376,7 @@ def parse_options():
 		sys.exit(1)
 
 	# r >= 2
-	if _commandlineoptions.redundancy!= None and _commandlineoptions.redundancy < 2:
+	if _commandlineoptions.redundancy != None and _commandlineoptions.redundancy < 2:
 		print "Redundancy must be > 1"
 		sys.exit(1)
 
@@ -384,7 +384,7 @@ def parse_options():
 	if _commandlineoptions.redundancy > _commandlineoptions.numberofmirrors:
 		print "Redundancy must be less or equal to number of mirrors (", _commandlineoptions.numberofmirrors, ")"
 		sys.exit(1)
-		
+
 	# RNG or parallel query without chunks activated
 	if (_commandlineoptions.rng or _commandlineoptions.parallel) and not _commandlineoptions.redundancy:
 		print "Chunks must be enabled and redundancy set (-r) to use RNG or parallel queries!"
@@ -392,7 +392,7 @@ def parse_options():
 
 	if _commandlineoptions.numberofthreads == None:
 		_commandlineoptions.numberofthreads = _commandlineoptions.numberofmirrors
-		
+
 	_commandlineoptions.numberofthreads = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
 
 	if _commandlineoptions.numberofthreads < 1:
@@ -417,7 +417,7 @@ def main():
 
 		# ...make sure it is valid...
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
-		
+
 		# ...and write it out if it's okay
 		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
 
@@ -428,14 +428,14 @@ def main():
 		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
 
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
-	
+
 
 	# we will check that the files are in the release
 
 	# find the list of files
 	manifestfilelist = raidpirlib.get_filenames_in_release(manifestdict)
 
-	
+
 	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors * 8) and _commandlineoptions.redundancy != None:
 		print "Block count too low to use chunks! Try reducing the block size or add more files to the database."
 		sys.exit(1)
@@ -450,9 +450,9 @@ def main():
 		if filename not in manifestfilelist:
 			print "The file", filename, "is not listed in the manifest."
 			sys.exit(2)
-	
+
 	# don't run PIR if we're just printing the filenames in the manifest
-	if len(_commandlineoptions.filestoretrieve) > 0:	
+	if len(_commandlineoptions.filestoretrieve) > 0:
 		request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
 
 
@@ -462,4 +462,4 @@ if __name__ == '__main__':
 
 	parse_options()
 	main()
-	
+
