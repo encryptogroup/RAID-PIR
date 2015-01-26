@@ -176,7 +176,6 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 	"""
 
 	# let's get the list of mirrors...
-
 	if _commandlineoptions.vendorip == None:
 		mirrorinfolist = raidpirlib.retrieve_mirrorinfolist(manifestdict['vendorhostname'], manifestdict['vendorport'])
 	else:
@@ -206,11 +205,13 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 
 	else: # chunks
 
-		# let's set up a requestor object...
+		# let's set up a chunk requestor object...
 		rxgobj = simplexorrequestor.RandomXORRequestorChunks(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, redundancy, rng, parallel)
 
 		print "# Blocks needed:", len(rxgobj.activemirrorinfolist[0]['blocksneeded'])
-		print "# Requests:", len(rxgobj.activemirrorinfolist[0]['blockchunklist'])
+
+		if parallel:
+			print "# Requests:", len(rxgobj.activemirrorinfolist[0]['blockchunklist'])
 
 		#chunk lengths in BYTE
 		global chunklen

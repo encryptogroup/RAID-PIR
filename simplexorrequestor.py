@@ -201,16 +201,15 @@ class RandomXORRequestor(object):
 			params = {}
 			params['cn'] = 1 # chunk numbers, here fixed to 1
 			params['k'] = privacythreshold
-			params['r'] = privacythreshold
+			params['r'] = privacythreshold # r is irrelevant here, thus fixed to k
 			params['cl'] = 1 # chunk length, here fixed to 1
 			params['lcl'] = 1 # last chunk length, here fixed to 1
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
 			thisrequestinfo['rt'] = t
 			t.start()
-
 
 		bitstringlength = raidpirlib.compute_bitstring_length(manifestdict['blockcount'])
 
@@ -552,7 +551,7 @@ class RandomXORRequestorChunks(object):
 			raidpirlib.send_params(thisrequestinfo['mirrorinfo']['socket'], params)
 
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_t" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
 			thisrequestinfo['rt'] = t
 			t.start()
 
