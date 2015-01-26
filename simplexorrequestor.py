@@ -155,11 +155,9 @@ class RandomXORRequestor(object):
 
 			manifestdict: the manifest with information about the release
 
-			privacythreshold: the number of mirrors that would need to collude to
-											 break privacy
+			privacythreshold: the number of mirrors that would need to collude to break privacy
 
-			pollinginterval: the amount of time to sleep between checking for
-											 the ability to serve a mirror.
+			pollinginterval: the amount of time to sleep between checking for the ability to serve a mirror.
 
 		<Exceptions>
 			TypeError may be raised if invalid parameters are given.
@@ -178,7 +176,6 @@ class RandomXORRequestor(object):
 		# now we do the 'random' part.   I copy the mirrorinfolist to avoid changing the list in place.
 		self.fullmirrorinfolist = mirrorinfolist[:]
 		random.shuffle(self.fullmirrorinfolist)
-
 
 		# let's make a list of mirror information (what has been retrieved, etc.)
 		self.activemirrorinfolist = []
@@ -258,7 +255,7 @@ class RandomXORRequestor(object):
 			thisrequestinfo['mirrorinfo']['socket'].close()
 
 
-	def get_next_xorrequest(self):
+	def get_next_xorrequest(self, tid):
 		"""
 		<Purpose>
 			Gets the next requesttuple that should be returned
@@ -275,52 +272,22 @@ class RandomXORRequestor(object):
 
 		"""
 
-		# Three cases I need to worry about:
+		# Two cases I need to worry about:
 		#   1) nothing that still needs to be requested -> return ()
-		#   2) requests remain, but all mirrors are busy -> block until ready
-		#   3) there is a request ready -> return the tuple
-		#
+		#   2) there is a request ready -> return the request
 
-		# I'll exit via return.   I will loop to sleep while waiting.
-		# I could use a condition variable here, but this should be fine.   There
-		# should almost always be < 5 threads.   Also, why would we start more
-		# threads than there are mirrors we will contact?   (As such, sleeping
-		# should only happen at the very end)
-		while True:
-			# lock the table...
-			self.tablelock.acquire()
+		requestinfo = self.activemirrorinfolist[tid]
 
-			# but always release it
-			try:
+		# this mirror is done...
+		if len(requestinfo['blocksneeded']) == 0:
+			return ()
 
-				for requestinfo in self.activemirrorinfolist:
+		# otherwise set it to be taken...
+		requestinfo['servingrequest'] = True
+		blocknum = requestinfo['blocksneeded'].pop() #TODO this was pop(0), revert in case of error, same for the return below!
+		requestinfo['blocksrequested'].append(blocknum)
 
-					# if this mirror is serving a request, skip it...
-# 					if requestinfo['servingrequest']:
-# 						stillserving = True
-# 						continue
-
-					# this mirror is done...
-					if len(requestinfo['blocksneeded']) == 0:
-						continue
-
-					# otherwise set it to be taken...
-					requestinfo['servingrequest'] = True
-					blocknum = requestinfo['blocksneeded'].pop(0)
-					requestinfo['blocksrequested'].append(blocknum)
-
-					return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop(0))
-
-				#no blocks left to request
-				return ()
-
-			finally:
-				# I always want someone else to be able to get the lock
-				self.tablelock.release()
-
-			# otherwise, I've looked an nothing is ready...   I'll sleep and retry
-			time.sleep(self.pollinginterval)
-
+		return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop())
 
 
 	def notify_failure(self, xorrequesttuple):
@@ -353,7 +320,7 @@ class RandomXORRequestor(object):
 
 			failedmirrorsinfo = xorrequesttuple[0]
 
-			# now, let's find the activemirror this corresponds ro.
+			# now, let's find the activemirror this corresponds to.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
 
@@ -395,10 +362,9 @@ class RandomXORRequestor(object):
 		#... but always release it
 		try:
 
-			# now, let's find the activemirror this corresponds ro.
+			# now, let's find the activemirror this corresponds to.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
-
 
 					# remove the block and bitstring (asserting they match what we said before)
 					blocknumber = activemirrorinfo['blocksrequested'].pop(0)
@@ -726,7 +692,7 @@ class RandomXORRequestorChunks(object):
 			thisrequestinfo['mirrorinfo']['socket'].close()
 
 	# chunked version:
-	def get_next_xorrequest(self):
+	def get_next_xorrequest(self, tid):
 		"""
 		<Purpose>
 			Gets the next request tuple that should be returned
@@ -743,71 +709,40 @@ class RandomXORRequestorChunks(object):
 
 		"""
 
-		# Three cases I need to worry about:
-		#   1) nothing that still needs to be requested -> return ()
-		#   2) requests remain, but all mirrors are busy -> block until ready
-		#   3) there is a request ready -> return the tuple
-		#
-
-		# I'll exit via return.   I will loop to sleep while waiting.
-		# I could use a condition variable here, but this should be fine.   There
-		# should almost always be < 5 threads.   Also, why would we start more
-		# threads than there are mirrors we will contact?   (As such, sleeping
-		# should only happen at the very end)
-		while True:
-			# lock the table...
-			self.tablelock.acquire()
-
-			# but always release it
-			try:
-				for requestinfo in self.activemirrorinfolist:
+		requestinfo = self.activemirrorinfolist[tid]
 
 
-					# if this mirror is serving a request, skip it...
-# 					if requestinfo['servingrequest']:
-# 						stillserving = True
-# 						continue
+		if self.parallel:
+			if len(requestinfo['parallelblocksneeded']) == 0:
+				return ()
+			# otherwise set it to be taken...
+			requestinfo['servingrequest'] = True
 
+			blocknums = requestinfo['parallelblocksneeded'].pop(0)
+			requestinfo['blocksrequested'].append(blocknums)
 
-					if self.parallel:
-						if len(requestinfo['parallelblocksneeded']) == 0:
-							continue
-						# otherwise set it to be taken...
-						requestinfo['servingrequest'] = True
+			if self.rng:
+				return (requestinfo['mirrorinfo'], blocknums, requestinfo['blockchunklist'].pop(0), 2)
+			else:
+				raise Exception("Parallel Query without RNG not yet implemented!")
 
-						blocknums = requestinfo['parallelblocksneeded'].pop(0)
-						requestinfo['blocksrequested'].append(blocknums)
-
-						if self.rng:
-							return (requestinfo['mirrorinfo'], blocknums, requestinfo['blockchunklist'].pop(0), 2)
-						else:
-							raise Exception("Parallel Query without RNG not yet implemented!") #TODO
-
-					#single block
-					else:
-						# this mirror is done...
-						if len(requestinfo['blocksneeded']) == 0:
-							continue
-
-						# otherwise set it to be taken...
-						requestinfo['servingrequest'] = True
-
-						blocknum = requestinfo['blocksneeded'].pop(0)
-						requestinfo['blocksrequested'].append(blocknum)
-
-						if self.rng:
-							return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 1)
-						else:
-							return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
-
+		#single block
+		else:
+			# this mirror is done...
+			if len(requestinfo['blocksneeded']) == 0:
 				return ()
 
-			finally:
-				# I always want someone else to be able to get the lock
-				self.tablelock.release()
+			# otherwise set it to be taken...
+			requestinfo['servingrequest'] = True
 
-			# otherwise, I've looked an nothing is ready...   I'll sleep and retry
-			time.sleep(self.pollinginterval)
+			blocknum = requestinfo['blocksneeded'].pop(0)
+			requestinfo['blocksrequested'].append(blocknum)
+
+			if self.rng:
+				return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 1)
+			else:
+				return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
+
 
 
 
@@ -843,7 +778,7 @@ class RandomXORRequestorChunks(object):
 
 			failedmirrorsinfo = xorrequesttuple[0]
 
-			# now, let's find the activemirror this corresponds ro.
+			# now, let's find the activemirror this corresponds to.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
 
@@ -885,7 +820,7 @@ class RandomXORRequestorChunks(object):
 
 		try:
 
-			# now, let's find the activemirror this corresponds ro.
+			# now, let's find the activemirror this corresponds to.
 			for activemirrorinfo in self.activemirrorinfolist:
 				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
 

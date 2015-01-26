@@ -76,13 +76,13 @@ import simplexorrequestor
 import os.path
 
 
-def _request_helper(rxgobj):
-	# Private helper to get requests. Multiple threads will execute this...
-	thisrequest = rxgobj.get_next_xorrequest()
+def _request_helper(rxgobj, tid):
+	# Private helper to get requests. Multiple threads will execute this, each with a unique tid.
+	thisrequest = rxgobj.get_next_xorrequest(tid)
+	socket = thisrequest[0]['socket'] #the socket is fixed for each thread, so we only need to do this once
 
 	# go until there are no more requests
 	while thisrequest != ():
-		socket = thisrequest[0]['socket']
 		bitstring = thisrequest[2]
 		try:
 			# request the XOR block...
@@ -97,30 +97,23 @@ def _request_helper(rxgobj):
 				# otherwise, re-raise...
 				raise
 
-		#else:
-			# we retrieved it successfully...
-			#rxgobj.notify_success(thisrequest, xorblock)
-			#sys.stdout.write('.')
-			#sys.stdout.flush()
-
 		# regardless of failure or success, get another request...
-		thisrequest = rxgobj.get_next_xorrequest()
+		thisrequest = rxgobj.get_next_xorrequest(tid)
 
 	# and that's it!
 	return
 
-def _request_helper_chunked(rxgobj):
-	# Private helper to get requests. Potentially multiple threads will execute this...
-	thisrequest = rxgobj.get_next_xorrequest()
+def _request_helper_chunked(rxgobj, tid):
+	# Private helper to get requests. Potentially multiple threads will execute this, each with a unique tid.
+	thisrequest = rxgobj.get_next_xorrequest(tid)
+	socket = thisrequest[0]['socket'] #the socket is fixed for each thread, so we only need to do this once
+	rqtype = thisrequest[3] #the request type is also fixed
 
 	# go until there are no more requests
 	while thisrequest != ():
-		socket = thisrequest[0]['socket']
 		chunks = thisrequest[2]
-		rqtype = thisrequest[3]
 
 		try:
-
 			# request the XOR block...
 			if rqtype == 1: # chunks and seed expansion
 				raidpirlib.request_xorblock_from_mirror_chunked_rng(socket, chunks)
@@ -147,7 +140,7 @@ def _request_helper_chunked(rxgobj):
 			# sys.stdout.flush()
 
 		# regardless of failure or success, get another request...
-		thisrequest = rxgobj.get_next_xorrequest()
+		thisrequest = rxgobj.get_next_xorrequest(tid)
 
 	# and that's it!
 	return
@@ -192,10 +185,10 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		print "Blocks to request:", len(rxgobj.activemirrorinfolist[0]['blockbitstringlist'])
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
-		for _ in range(_commandlineoptions.numberofthreads - 1):
-			threading.Thread(target=_request_helper, args=[rxgobj]).start()
+		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
+			threading.Thread(target=_request_helper, args=[rxgobj, tid]).start()
 
-		_request_helper(rxgobj)
+		_request_helper(rxgobj, _commandlineoptions.numberofmirrors - 1)
 
 		# wait for receiving threads to finish
 		for mirror in rxgobj.activemirrorinfolist:
@@ -220,10 +213,10 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		lastchunklen = raidpirlib.compute_bitstring_length(manifestdict['blockcount']) - (_commandlineoptions.numberofmirrors-1)*chunklen
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
-		for _ in range(_commandlineoptions.numberofthreads - 1):
-			threading.Thread(target=_request_helper_chunked, args=[rxgobj]).start()
+		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
+			threading.Thread(target=_request_helper_chunked, args=[rxgobj, tid]).start()
 
-		_request_helper_chunked(rxgobj)
+		_request_helper_chunked(rxgobj, _commandlineoptions.numberofmirrors - 1)
 
 		# wait for receiving threads to finish
 		for mirror in rxgobj.activemirrorinfolist:
@@ -362,12 +355,6 @@ def parse_options():
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
 				help="Query one block per chunk in parallel (default False). Requires -r")
 
-	parser.add_option("-t", "--numberofthreads", dest="numberofthreads",
-				type="int", default=None,
-				help="How many threads should concurrently contact servers? (default numberofmirrors)")
-
-
-
 	# let's parse the args
 	(_commandlineoptions, remainingargs) = parser.parse_args()
 
@@ -389,18 +376,6 @@ def parse_options():
 	# RNG or parallel query without chunks activated
 	if (_commandlineoptions.rng or _commandlineoptions.parallel) and not _commandlineoptions.redundancy:
 		print "Chunks must be enabled and redundancy set (-r <number>) to use RNG or parallel queries!"
-		sys.exit(1)
-
-	if _commandlineoptions.numberofthreads == None:
-		_commandlineoptions.numberofthreads = _commandlineoptions.numberofmirrors
-	elif _commandlineoptions.numberofthreads > _commandlineoptions.numberofmirrors:
-		print "Number of threads must be less or equal to number of mirrors (", _commandlineoptions.numberofmirrors, ")"
-		sys.exit(1)
-
-	_commandlineoptions.numberofthreads = 1 # This is a temporary workaround. TODO fix this and use up to 1 thread per mirror/socket
-
-	if _commandlineoptions.numberofthreads < 1:
-		print "Number of threads must be positive"
 		sys.exit(1)
 
 	if len(remainingargs) == 0 and _commandlineoptions.printfiles == False:
