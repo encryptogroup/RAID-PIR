@@ -809,6 +809,12 @@ def flip_bitstring_bit(bitstring, bitnum):
 	return set_bitstring_bit(bitstring, bitnum, targetbit)
 
 
+def flip_array_bit(ba, bitnum):
+	"""flips a bit in a array, 0 = MSB. works with numpy arrays or byte arrays"""
+	ba[bitnum >> 3] ^= (1<< (7 - (bitnum % 8)))
+	return ba
+
+
 def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1024, offset_assignment_function=nogaps_offset_assignment_function, vendorhostname=None, vendorport=62293):
 	"""
 	<Purpose>
