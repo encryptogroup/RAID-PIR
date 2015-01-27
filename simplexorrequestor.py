@@ -9,7 +9,6 @@
 
 """
 
-
 # I'll use this to XOR the result together
 import simplexordatastore
 
@@ -35,13 +34,11 @@ except ImportError:
 	print "Requires MsgPack module (http://msgpack.org/)"
 	sys.exit(1)
 
-
 import os
 _randomnumberfunction = os.urandom
 
 # used for mirror selection...
 import random
-
 
 
 ########################### XORRequestGenerator ###############################
@@ -55,7 +52,6 @@ def rcvlet(requestinfo, rxgobj):
 		first = False
 		data = session.recvmessage(sock)
 		rxgobj.notify_success(requestinfo['mirrorinfo'], data)
-
 
 
 def _reconstruct_block(blockinfolist):
@@ -87,7 +83,6 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m][c])
 
 	return results
-
 
 
 class InsufficientMirrors(Exception):
@@ -139,8 +134,6 @@ class RandomXORRequestor(object):
 		()
 
 	"""
-
-
 
 
 	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, pollinginterval=.1):
@@ -218,7 +211,7 @@ class RandomXORRequestor(object):
 
 		# now, let's do the 'derived' ones...
 		for blocknum in xrange(len(blocklist)):
-			thisbitstring = '\0'*bitstringlength
+			thisbitstring = '\0'*bitstringlength #TODO change to bytearray
 
 			# xor the random strings together
 			for requestinfo in self.activemirrorinfolist[:-1]:
@@ -284,7 +277,7 @@ class RandomXORRequestor(object):
 
 		# otherwise set it to be taken...
 		requestinfo['servingrequest'] = True
-		blocknum = requestinfo['blocksneeded'].pop() #TODO this was pop(0), revert in case of error, same for the return below!
+		blocknum = requestinfo['blocksneeded'].pop()
 		requestinfo['blocksrequested'].append(blocknum)
 
 		return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop())
@@ -334,8 +327,6 @@ class RandomXORRequestor(object):
 		finally:
 			# release the lock
 			self.tablelock.release()
-
-
 
 
 	def notify_success(self, thismirrorsinfo, xorblock):
@@ -399,9 +390,6 @@ class RandomXORRequestor(object):
 			self.tablelock.release()
 
 
-
-
-
 	def return_block(self, blocknum):
 		"""
 		<Purpose>
@@ -421,13 +409,10 @@ class RandomXORRequestor(object):
 		return self.finishedblockdict[blocknum]
 
 
-
 ######################################################################
 
 
-
 class RandomXORRequestorChunks(object):
-
 
 	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, pollinginterval=.1):
 		"""
@@ -497,10 +482,9 @@ class RandomXORRequestorChunks(object):
 
 			if rng:
 				#pick a random seed (key) and initialize AES
-				seed = _randomnumberfunction(16)
+				seed = _randomnumberfunction(16) # random 128 bit key
 				thisrequestinfo['seed'] = seed
 				thisrequestinfo['cipher'] = raidpirlib.initAES(seed)
-
 
 			self.activemirrorinfolist.append(thisrequestinfo)
 
@@ -610,7 +594,6 @@ class RandomXORRequestorChunks(object):
 			#iterate through all blocks
 			for blocknum in blocklist:
 
-
 				#iterate through mirrors
 				for thisrequestinfo in self.activemirrorinfolist:
 
@@ -633,7 +616,6 @@ class RandomXORRequestorChunks(object):
 							chunks[c] = raidpirlib.randombits(length)
 
 					thisrequestinfo['blockchunklist'].append(chunks)
-
 
 				# now derive the first chunks
 				for thisrequestinfo in self.activemirrorinfolist:
@@ -686,7 +668,7 @@ class RandomXORRequestorChunks(object):
 
 
 	def cleanup(self):
-		# close sockets
+		"""cleanup. here: close sockets"""
 		for thisrequestinfo in self.activemirrorinfolist:
 			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "Q")
 			thisrequestinfo['mirrorinfo']['socket'].close()
@@ -744,10 +726,6 @@ class RandomXORRequestorChunks(object):
 				return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
 
 
-
-
-
-
 	def notify_failure(self, xorrequesttuple):
 		"""
 		<Purpose>
@@ -792,8 +770,6 @@ class RandomXORRequestorChunks(object):
 		finally:
 			# release the lock
 			self.tablelock.release()
-
-
 
 
 	def notify_success(self, thismirrorsinfo, xorblock):

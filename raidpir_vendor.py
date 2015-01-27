@@ -34,16 +34,12 @@
 # in the server portion although, the mirror would also need to include
 # a way to blacklist offending mirrors to prevent them from re-registering
 
-
-
-
 import sys
 
 import optparse
 
 # helper functions that are shared
 import raidpirlib
-
 
 # Check the python version
 if sys.version_info[0] != 2 or sys.version_info[1] != 7:
@@ -63,15 +59,11 @@ import session
 # used to get a lock
 import threading
 
-
 # to handle protocol requests
 import SocketServer
 
 # to run in the background...
 import daemon
-
-#import getmyip
-
 
 # for logging purposes...
 import time
@@ -84,15 +76,9 @@ def _log(stringtolog):
 	_logfo.write(str(time.time()) + " " + stringtolog + "\n")
 	_logfo.flush()
 
-
-
-# JAC: I don't normally like to use Python's socket servers because of the lack
-#      of control but I'll give it a try this time.   Passing arguments to
-#      requesthandlers is a PITA.   I'll use a messy global instead
 _global_rawmanifestdata = None
 _global_rawmirrorlist = None
 
-# These are more defensible.
 _global_mirrorinfodict = {}
 _global_mirrorinfolock = threading.Lock()
 
@@ -131,8 +117,6 @@ def _check_for_expired_mirrorinfo():
 			_global_mirrorinfolock.release()
 
 
-
-
 def _add_mirrorinfo_to_list(thismirrorinfo):
 	# Private function to add mirror information
 	_log("RAID-PIR Vendor _add_mirrorinfo_to_list " + str(thismirrorinfo))
@@ -152,11 +136,7 @@ def _add_mirrorinfo_to_list(thismirrorinfo):
 		_global_mirrorinfolock.release()
 
 
-
-
-
 ######################### Serve RAID-PIR Vendor requests ########################
-
 
 # I don't need to change this much, I think...
 class ThreadedVendorServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
@@ -258,9 +238,6 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			return
 
 
-
-
-
 def start_vendor_service(manifestdict, ip, port):
 
 	# this should be done before we are called
@@ -269,10 +246,8 @@ def start_vendor_service(manifestdict, ip, port):
 	# create the handler / server
 	vendorserver = ThreadedVendorServer((ip, port), ThreadedVendorRequestHandler)
 
-
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	threading.Thread(target=vendorserver.serve_forever, name="RAID-PIR Vendor server").start()
-
 
 
 ########################### Option parsing and main ###########################
@@ -335,16 +310,13 @@ def parse_options():
 	parser.add_option("", "--port", dest="port", type="int", metavar="portnum",
 				default=None, help="Run the vendor on the following port (default: from manifest)")
 
-
 	# let's parse the args
 	(_commandlineoptions, remainingargs) = parser.parse_args()
-
 
 	# check the maxmirrorinfo
 	if _commandlineoptions.maxmirrorinfo <= 0:
 		print "Max mirror info size must be positive"
 		sys.exit(1)
-
 
 	if remainingargs:
 		print "Unknown options", remainingargs
@@ -354,11 +326,9 @@ def parse_options():
 	_logfo = open(_commandlineoptions.logfilename, 'a')
 
 
-
 def main():
 	global _global_rawmanifestdata
 	global _global_rawmirrorlist
-
 
 	# read in the manifest file
 	rawmanifestdata = open(_commandlineoptions.manifestfilename).read()

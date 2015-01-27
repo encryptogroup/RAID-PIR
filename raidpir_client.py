@@ -77,7 +77,7 @@ import os.path
 
 
 def _request_helper(rxgobj, tid):
-	# Private helper to get requests. Multiple threads will execute this, each with a unique tid.
+	"""Private helper to get requests. Multiple threads will execute this, each with a unique tid."""
 	thisrequest = rxgobj.get_next_xorrequest(tid)
 	socket = thisrequest[0]['socket'] #the socket is fixed for each thread, so we only need to do this once
 
@@ -104,7 +104,7 @@ def _request_helper(rxgobj, tid):
 	return
 
 def _request_helper_chunked(rxgobj, tid):
-	# Private helper to get requests. Potentially multiple threads will execute this, each with a unique tid.
+	"""Private helper to get requests with chunks. Potentially multiple threads will execute this, each with a unique tid."""
 	thisrequest = rxgobj.get_next_xorrequest(tid)
 	socket = thisrequest[0]['socket'] #the socket is fixed for each thread, so we only need to do this once
 	rqtype = thisrequest[3] #the request type is also fixed
@@ -133,12 +133,6 @@ def _request_helper_chunked(rxgobj, tid):
 				# otherwise, re-raise...
 				raise
 
-		#else:
-			# we retrieved it successfully...
-			#rxgobj.notify_success(thisrequest, xorblock)
-			# sys.stdout.write('.')
-			# sys.stdout.flush()
-
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest(tid)
 
@@ -147,7 +141,6 @@ def _request_helper_chunked(rxgobj, tid):
 
 
 def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rng, parallel):
-
 	"""
 	<Purpose>
 		Retrieves blocks from mirrors
@@ -386,9 +379,8 @@ def parse_options():
 	_commandlineoptions.filestoretrieve = remainingargs
 
 
-
 def main():
-
+	"""main function with high level control flow"""
 
 	# If we were asked to retrieve the mainfest file, do so...
 	if _commandlineoptions.retrievemanifestfrom:
@@ -404,7 +396,6 @@ def main():
 
 	else:
 		# Simply read it in from disk
-
 		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
 
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
@@ -415,14 +406,12 @@ def main():
 	# find the list of files
 	manifestfilelist = raidpirlib.get_filenames_in_release(manifestdict)
 
-
 	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors * 8) and _commandlineoptions.redundancy != None:
 		print "Block count too low to use chunks! Try reducing the block size or add more files to the database."
 		sys.exit(1)
 
 	if _commandlineoptions.printfiles:
 		print "Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:\n", manifestfilelist
-
 
 	# ensure the requested files are in there...
 	for filename in _commandlineoptions.filestoretrieve:
@@ -436,9 +425,7 @@ def main():
 		request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
 
 
-
 if __name__ == '__main__':
 	print "RAID-PIR Client", raidpirlib.pirversion
-
 	parse_options()
 	main()

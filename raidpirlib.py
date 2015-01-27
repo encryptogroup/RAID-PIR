@@ -62,7 +62,7 @@ _required_manifest_keys = ['manifestversion', 'blocksize', 'blockcount', 'hashal
 
 # the original implementation, used in mirrors that hold data in RAM
 def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, hashalgorithm):
-	# private helper, used both the compute and check hashes
+	"""private helper, used both the compute and check hashes"""
 
 	currenthashlist = []
 
@@ -85,7 +85,7 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 
 # implementation to read every file from disk to prevent ram from filling up. used for creating manifest.
 def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgorithm):
-	# private helper, used both the compute and check hashes
+	"""private helper, used both the compute and check hashes"""
 
 	print "Calculating block hashes with algorithm", hashalgorithm, "..."
 
@@ -132,9 +132,8 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 	return currenthashlist
 
 
-
 def _validate_manifest(manifest):
-	# private function that validates the manifest is okay
+	"""private function that validates the manifest is okay"""
 	# it raises a TypeError if it's not valid for some reason
 	if type(manifest) != dict:
 		raise TypeError("Manifest must be a dict!")
@@ -159,7 +158,7 @@ _supported_hashalgorithms = ['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha51
 _supported_hashencodings = ['hex', 'raw']
 
 def find_hash(contents, algorithm):
-	# Helper function for hashing...
+	"""Helper function for hashing"""
 
 	# first, if it's a noop, do nothing. For testing and debugging only.
 	if algorithm == 'noop' or algorithm == "none" or algorithm == None:
@@ -180,7 +179,6 @@ def find_hash(contents, algorithm):
 	if hashencoding not in _supported_hashencodings:
 		raise TypeError("Do not understand hash encoding: '" + algorithm + "'")
 
-
 	hashobj = hashlib.new(hashalgorithmname)
 
 	hashobj.update(contents)
@@ -191,7 +189,6 @@ def find_hash(contents, algorithm):
 		return hashobj.hexdigest()
 	else:
 		raise Exception("Internal Error! Unknown hashencoding '" + hashencoding + "'")
-
 
 
 def transmit_mirrorinfo(mirrorinfo, vendorlocation, defaultvendorport=62293):
@@ -227,7 +224,6 @@ def transmit_mirrorinfo(mirrorinfo, vendorlocation, defaultvendorport=62293):
 	if answer != "OK":
 		# JAC: I don't really like using ValueError. I should define a new one
 		raise ValueError(answer)
-
 
 
 def retrieve_rawmanifest(vendorlocation, defaultvendorport=62293):
@@ -292,14 +288,12 @@ def request_xorblock_from_mirror(socket, bitstring):
 
 
 def retrieve_xorblock_from_mirror_chunked(socket, chunks):
-
 	response = _remote_query_helper_sock(socket, "C" + msgpack.packb(chunks))
 
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
 	# print "CHUNKED Query", len(msgpack.packb(chunks)), "|", len(response)
-
 	return response
 
 # only request a xorblock, without receiving it
@@ -308,13 +302,11 @@ def request_xorblock_from_mirror_chunked(socket, chunks):
 
 
 def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
-
 	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
 	# print "CHUNKED RNG Query", len(msgpack.packb(chunks)), "|", len(response)
-
 	return response
 
 # only request a xorblock, without receiving it
@@ -323,13 +315,11 @@ def request_xorblock_from_mirror_chunked_rng(socket, chunks):
 
 
 def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
-
 	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
 	# print "CHUNKED RNG PAR Query", len(msgpack.packb(chunks)), "|", len(response)
-
 	return response
 
 
@@ -463,9 +453,6 @@ def parse_manifest(rawmanifestdata):
 	return manifestdict
 
 
-
-
-
 def populate_xordatastore(manifestdict, xordatastore, rootdir="."):
 	"""
 	<Purpose>
@@ -521,7 +508,6 @@ def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm):
 		thisoffset = thisfiledict['offset']
 		thisfilelength = thisfiledict['length']
 
-
 		thisfilename = os.path.join(rootdir, thisrelativefilename)
 
 		# read in the files and populate the xordatastore
@@ -559,7 +545,6 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 		thisoffset = thisfiledict['offset']
 		thisfilelength = thisfiledict['length']
 
-
 		thisfilename = os.path.join(rootdir, thisrelativefilename)
 
 		# read in the files and populate the xordatastore
@@ -591,8 +576,6 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 		offsetdict[thisoffset] = thisfilename
 
 	print "Offset-Dict generated."
-
-
 
 
 def nogaps_offset_assignment_function(fileinfolist, rootdir, blocksize):
@@ -628,13 +611,11 @@ def nogaps_offset_assignment_function(fileinfolist, rootdir, blocksize):
 		currentoffset = currentoffset + thisfileinfo['length']
 
 
-
 def _find_blockloc_from_offset(offset, sizeofblocks):
 	# Private helper function that translates an offset into (block, offset)
 	assert offset >= 0
 
 	return (offset / sizeofblocks, offset % sizeofblocks)
-
 
 
 def extract_file_from_blockdict(filename, manifestdict, blockdict):
@@ -694,8 +675,6 @@ def extract_file_from_blockdict(filename, manifestdict, blockdict):
 			return currentstring
 
 
-
-
 def get_blocklist_for_file(filename, manifestdict):
 	"""
 	<Purpose>
@@ -727,9 +706,6 @@ def get_blocklist_for_file(filename, manifestdict):
 	raise TypeError("File is not in manifest")
 
 
-
-
-
 def get_filenames_in_release(manifestdict):
 	"""
 	<Purpose>
@@ -756,10 +732,8 @@ def get_filenames_in_release(manifestdict):
 	return filenamelist
 
 
-
-
 def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
-	# private helper.   Generates a list of file information dictionaries for all files under startdirectory.
+	"""private helper.   Generates a list of file information dictionaries for all files under startdirectory."""
 
 	fileinfo_list = []
 
@@ -784,18 +758,18 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
 
 			fileinfo_list.append(thisfiledict)
 
-
 	print "Fileinfolist generation done."
 	return fileinfo_list
 
 
 def compute_bitstring_length(num_blocks):
-	# quick function to compute bitstring length
-	return int(math.ceil(num_blocks / 8.0))
+	"""compute bitstring length in bytes from number of blocks"""
+	return (num_blocks + 7) >> 3
+
 
 def set_bitstring_bit(bitstring, bitnum, valuetoset):
-	# quick function to set a bit in a bitstring...
-	bytepos = bitnum / 8
+	"""set a bit in a bitstring, 0 = MSB"""
+	bytepos = bitnum >> 3
 	bitpos = 7 - (bitnum % 8)
 
 	bytevalue = ord(bitstring[bytepos])
@@ -817,23 +791,22 @@ def set_bitstring_bit(bitstring, bitnum, valuetoset):
 
 
 def get_bitstring_bit(bitstring, bitnum):
-	# returns a bit...
-	bytepos = bitnum / 8
+	"""returns a single bit from within a bitstring, 0 = MSB"""
+	bytepos = bitnum >> 3
 	bitpos = 7 - (bitnum % 8)
 
 	# we want to return 0 or 1.   I'll AND 2^bitpos and then divide by it
-	return (ord(bitstring[bytepos]) & (2 ** bitpos)) / (2 ** bitpos)
+	return (ord(bitstring[bytepos]) & (2 ** bitpos)) >> bitpos
 
 
 def flip_bitstring_bit(bitstring, bitnum):
-	# reverses the setting of a bit
+	"""reverses the setting of a bit, 0 = MSB"""
 	targetbit = get_bitstring_bit(bitstring, bitnum)
 
 	# 0 -> 1, 1 -> 0
 	targetbit = 1 - targetbit
 
 	return set_bitstring_bit(bitstring, bitnum, targetbit)
-
 
 
 def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1024, offset_assignment_function=nogaps_offset_assignment_function, vendorhostname=None, vendorport=62293):
@@ -973,7 +946,6 @@ def randombits(bitlength):
 		return os.urandom(bytelength)
 
 
-
 def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):
 	"""
 	<Purpose>
@@ -1007,9 +979,23 @@ def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):
 
 	return result
 
+
 def build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen):
 	"""
+	<Purpose>
+		Creates a single bitstring from given chunks
 
+	<Arguments>
+		chunks: the dictionary of chunk indices and query data (random strings)
+
+		k: the number of servers
+
+		chunklen: the length of the first k-1 chunks in Bytes
+
+		lastchunklen: the length of the last chunk in Bytes ( >= chunklen )
+
+	<Returns>
+		A dictionary
 	"""
 
 	result = {}
@@ -1020,7 +1006,7 @@ def build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen):
 	for c in chunks:
 		bitstring = ""
 
-		for i in range(0, k):
+		for i in xrange(k):
 
 			if i == c:
 				bitstring = bitstring + chunks[c]
@@ -1049,8 +1035,6 @@ def initAES(seed):
 
 	ctr = Counter.new(128)
 	return AES.new(seed, AES.MODE_CTR, counter=ctr)
-
-
 
 
 def nextrandombitsAES(cipher, bitlength):
@@ -1088,8 +1072,8 @@ def nextrandombitsAES(cipher, bitlength):
 		return cipher.encrypt(pt)
 
 
-
 def send_params(socket, params):
+	"""Sends the given parameters to the socket and gets for response"""
 	response = _remote_query_helper_sock(socket, "P" + msgpack.packb(params))
 	if response != 'PARAMS OK':
 		raise ValueError(response)

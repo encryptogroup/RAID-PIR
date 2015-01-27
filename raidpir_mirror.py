@@ -35,7 +35,6 @@
 # One can define new xordatastore types (although I need a more explicit plugin
 # module).   These could include memoization and other optimizations to
 # further improve the speed of XOR processing.
-#
 
 
 import sys
@@ -75,28 +74,20 @@ except ImportError:
 	print "Requires MsgPack module (http://msgpack.org/)"
 	sys.exit(1)
 
-
-
-_logfo=None
+_logfo = None
 
 def _log(stringtolog):
-	# helper function to log data
+	"""helper function to log data"""
 	_logfo.write(str(time.time()) +" "+stringtolog+"\n")
 	_logfo.flush()
 
-
-
-# JAC: I don't normally like to use Python's socket servers because of the lack
-#      of control but I'll give it a try this time.   Passing arguments to
-#      requesthandlers is a PITA.   I'll use a messy global instead
 _global_myxordatastore = None
 _global_manifestdict = None
 
 
 #################### Advertising ourself with the vendor ######################
-
 def _send_mirrorinfo():
-	# private function that sends our mirrorinfo to the vendor
+	"""private function that sends our mirrorinfo to the vendor"""
 
 
 	# adding more information here  is a natural way to extend the mirror /
@@ -110,17 +101,13 @@ def _send_mirrorinfo():
 	else:
 		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport'])
 
-
 ############################### Serve via RAID-PIR ###############################
-
 
 # I don't need to change this much, I think...
 class ThreadedXORServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 	allow_reuse_address = True
 
-
 class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
-
 
 	def handle(self):
 		global chunknumbers
@@ -162,7 +149,6 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 
 				# done!
-				#return
 
 			elif requeststring.startswith('C'):
 
@@ -179,16 +165,13 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
-
 				#done!
-				#return
 
 			elif requeststring.startswith('R'):
 
 				payload = requeststring[len('R'):]
 
 				chunks = msgpack.unpackb(payload)
-
 
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
@@ -211,7 +194,6 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
 				#done!
-				#return
 
 			elif requeststring.startswith('M'):
 
@@ -240,9 +222,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				session.sendmessage(self.request, msgpack.packb(result))
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
-
 				#done!
-				#return
 
 			elif requeststring.startswith('P'):
 
@@ -264,15 +244,12 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
 
 				#done!
-				#return
 
 			elif requeststring == 'HELLO':
 				# send a reply.
 				session.sendmessage(self.request, "HI!")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
-
 				# done!
-				#return
 
 			#the client asked to close the connection
 			elif requeststring == 'Q':
@@ -287,10 +264,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request type starts:'"+requeststring[:5]+"'")
 
 				session.sendmessage(self.request, 'Invalid request type')
-
 				return
-
-
 
 
 def service_raidpir_clients(myxordatastore, ip, port):
@@ -301,16 +275,12 @@ def service_raidpir_clients(myxordatastore, ip, port):
 	# create the handler / server
 	xorserver = ThreadedXORServer((ip, port), ThreadedXORRequestHandler)
 
-
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server").start()
 
 
-
 ################################ Serve via HTTP ###############################
-
 import BaseHTTPServer
-
 import urlparse
 
 # handle a HTTP request
@@ -348,8 +318,6 @@ class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		#_log("HTTP "+self.client_address[0]+" "+str(self.client_address[1])+" "+(format % args))
 
 
-
-
 def service_http_clients(myxordatastore, manifestdict, ip, port):
 
 	# this must have already been set
@@ -360,8 +328,6 @@ def service_http_clients(myxordatastore, manifestdict, ip, port):
 
 	# and serve forever! Just like with RAID-PIR, this doesn't return so we need a new thread...
 	threading.Thread(target=httpserver.serve_forever, name="HTTP server").start()
-
-
 
 
 ########################### Option parsing and main ###########################
@@ -427,10 +393,8 @@ def parse_options():
 	parser.add_option("", "--vendorip", dest="vendorip", type="string", metavar="IP",
 				default=None, help="Vendor IP for overwriting the value from manifest")
 
-
 	# let's parse the args
 	(_commandlineoptions, remainingargs) = parser.parse_args()
-
 
 	# check the arguments
 	if _commandlineoptions.port <= 0 or _commandlineoptions.port > 65535:
@@ -512,7 +476,6 @@ def main():
 			_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 
 		time.sleep(_commandlineoptions.mirrorlistadvertisedelay)
-
 
 
 if __name__ == '__main__':
