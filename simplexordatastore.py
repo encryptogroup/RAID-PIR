@@ -40,8 +40,8 @@ def do_xor(string_a, string_b):
 	if len(string_a) != len(string_b):
 		raise ValueError("do_xor requires strings of the same length")
 
-	n_a = numpy.fromstring(string_a, dtype='uint8')
-	n_b = numpy.fromstring(string_b, dtype='uint8')
+	n_a = numpy.frombuffer(string_a, dtype='uint8')
+	n_b = numpy.frombuffer(string_b, dtype='uint8')
 
 	return (n_a ^ n_b).tostring()
 
@@ -67,8 +67,8 @@ def do_xor_blocks(string_a, string_b):
 	if len(string_a) != len(string_b):
 		raise ValueError("do_xor requires strings of the same length")
 
-	n_a = numpy.fromstring(string_a, dtype='uint64')
-	n_b = numpy.fromstring(string_b, dtype='uint64')
+	n_a = numpy.frombuffer(string_a, dtype='uint64')
+	n_b = numpy.frombuffer(string_b, dtype='uint64')
 
 	return (n_a ^ n_b).tostring()
 
