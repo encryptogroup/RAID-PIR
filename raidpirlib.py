@@ -741,6 +741,7 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
 	for parentdir, junkchilddirectories, filelist in os.walk(startdirectory):
 		for filename in filelist:
 			thisfiledict = {}
+
 			# we want the relative name in the manifest, not the actual path / name
 			thisfiledict['filename'] = filename
 			fullfilename = os.path.join(parentdir, filename)
@@ -810,7 +811,7 @@ def flip_bitstring_bit(bitstring, bitnum):
 
 
 def flip_array_bit(ba, bitnum):
-	"""flips a bit in a array, 0 = MSB. works with numpy arrays or byte arrays"""
+	"""flips a bit in an array, 0 = MSB. Works with numpy arrays or byte arrays"""
 	ba[bitnum >> 3] ^= (1<< (7 - (bitnum % 8)))
 	return ba
 
@@ -818,7 +819,7 @@ def flip_array_bit(ba, bitnum):
 def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1024, offset_assignment_function=nogaps_offset_assignment_function, vendorhostname=None, vendorport=62293):
 	"""
 	<Purpose>
-		Create a manifest  (and an xordatastore ?)
+		Create a manifest
 
 	<Arguments>
 		rootdir: The area to walk looking for files to add to the manifest
@@ -918,7 +919,6 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 	# let's generate the manifest's hash
 	rawmanifest = msgpack.packb(manifestdict)
 	manifestdict['manifesthash'] = find_hash(rawmanifest, manifestdict['hashalgorithm'])
-
 
 	# we are done!
 	return manifestdict
