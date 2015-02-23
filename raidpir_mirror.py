@@ -75,6 +75,7 @@ except ImportError:
 	sys.exit(1)
 
 _logfo = None
+_timer = time.time
 
 def _log(stringtolog):
 	"""helper function to log data"""
@@ -116,6 +117,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		global chunklen
 		global lastchunklen
 		global cipher
+		comp_time = 0
 
 		requeststring = '0'
 
@@ -125,6 +127,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 			# for logging purposes, get the remote info
 			# remoteip, remoteport = self.request.getpeername()
+
+			start_time = _timer()
 
 			# if it's a request for a XORBLOCK
 			if requeststring.startswith('X'):
@@ -143,6 +147,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
 
+				comp_time = comp_time + _timer() - start_time
+
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
@@ -160,6 +166,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+
+				comp_time = comp_time + _timer() - start_time
 
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
@@ -188,6 +196,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				# Now let's process this...
 				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+
+				comp_time = comp_time + _timer() - start_time
 
 				# and send the reply.
 				session.sendmessage(self.request, xoranswer)
@@ -218,6 +228,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				for c in chunknumbers:
 					result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
 
+				comp_time = comp_time + _timer() - start_time
+
 				# and send the reply.
 				session.sendmessage(self.request, msgpack.packb(result))
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
@@ -244,6 +256,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
 
 				#done!
+
+			#Timing Request
+			elif requeststring == 'T':
+				session.sendmessage(self.request, "T" + str(comp_time))
+				comp_time = 0
 
 			elif requeststring == 'HELLO':
 				# send a reply.
@@ -414,7 +431,7 @@ def parse_options():
 		sys.exit(1)
 
 	# try to open the log file...
-	_logfo = open(_commandlineoptions.logfilename, 'a')
+	#_logfo = open(_commandlineoptions.logfilename, 'a')
 
 
 def main():
