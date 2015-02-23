@@ -19,6 +19,7 @@ import math
 
 
 def do_xor(string_a, string_b):
+
 	if type(string_a) != str or type(string_b) != str:
 		raise TypeError("do_xor called with a non-string")
 

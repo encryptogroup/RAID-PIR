@@ -1,4 +1,4 @@
-/* Author: Justin Cappos
+/* Author: Daniel Demmler / Justin Cappos
  * File: fastsimplexordatastore.c
  * Purpose: The fastsimplexordatastore.   A simple, C-based datastore
  */
@@ -161,7 +161,6 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 		}
 	}
 }
-
 
 
 
@@ -376,12 +375,12 @@ static char *fast_XOR(char *dest, const char *data, long stringlength) {
 static PyObject *do_xor(PyObject *module, PyObject *args) {
 	const char *str1, *str2;
 	long length;
+	long dl; //dummy length for strings.
 	char *destbuffer;
 	char *useddestbuffer;
 
-
 	// Parse the calling arguments
-	if (!PyArg_ParseTuple(args, "s#s#l", &str1, &str2, &length)) {
+	if (!PyArg_ParseTuple(args, "s#s#l", &str1, &dl, &str2, &dl, &length)) {
 		return NULL;
 	}
 
@@ -404,7 +403,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 	fast_XOR(useddestbuffer, str2, length);
 
 	// Okay, let's return the answer!
-	PyObject *return_str_obj = Py_BuildValue("s#",useddestbuffer,length);
+	PyObject *return_str_obj = Py_BuildValue("s#", useddestbuffer, length);
 
 	// (after freeing the buffer)
 	free(destbuffer);

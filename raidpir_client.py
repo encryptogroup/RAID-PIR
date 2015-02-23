@@ -69,7 +69,6 @@ import raidpirlib
 # used to issue requests in parallel
 import threading
 
-# I really should have a way to do this based upon command line options
 import simplexorrequestor
 
 # for basename

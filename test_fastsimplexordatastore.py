@@ -37,7 +37,6 @@ assert(mystring == "Hello there")
 mystring = letterxordatastore.get_data(size*15,size)
 
 
-
 try:
 	letterxordatastore = fastsimplexordatastore.XORDatastore(127, 16)
 except TypeError:
@@ -81,3 +80,19 @@ for blockcount in [9,15,16]:
 		pass
 	else:
 		print "didn't detect incorrect (long) bitstring length"
+
+
+# test fastsimplexordatastore.do_xor()
+from os import urandom
+
+aa=urandom(2**10)
+bb=urandom(2**10)
+
+cc = fastsimplexordatastore.do_xor(aa,bb)
+
+# slow xor for verification
+result = ""
+for pos in xrange(len(aa)):
+	result = result + chr(ord(aa[pos]) ^ ord(bb[pos]))
+
+assert(result == cc)

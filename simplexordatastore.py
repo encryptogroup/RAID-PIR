@@ -1,15 +1,15 @@
 """
 <Author>
-	Justin Cappos
+	Daniel Demmler
+	(inspired from upPIR by Justin Cappos et al.)
 	(inspired from a previous version by Geremy Condra)
 
-<Start Date>
-	May 15th, 2011
+<Date>
+	December 2014
 
 <Description>
-	Library code that emulates the upPIR XORdatastore.   This is likely to only
-	be used for testing.   There will be a C version that will be much, much
-	faster
+	Library code that emulates the upPIR fastsimpleXORdatastore in C. This is likely to only
+	be used for testing.
 
 """
 

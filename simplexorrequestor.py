@@ -10,7 +10,7 @@
 """
 
 # I'll use this to XOR the result together
-import simplexordatastore
+import fastsimplexordatastore as xordatastore
 
 # helper functions that are shared
 import raidpirlib
@@ -60,7 +60,7 @@ def _reconstruct_block(blockinfolist):
 	# xor the blocks together
 	currentresult = blockinfolist[0]
 	for xorblock in blockinfolist[1:]:
-		currentresult = simplexordatastore.do_xor_blocks(currentresult, xorblock)
+		currentresult = xordatastore.do_xor(currentresult, xorblock)
 
 	# and return the answer
 	return currentresult
@@ -80,7 +80,7 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 	for m in range(k):
 		for c in results:
 			if c in responses[m]:
-				results[c] = simplexordatastore.do_xor_blocks(results[c], responses[m][c])
+				results[c] = xordatastore.do_xor(results[c], responses[m][c])
 
 	return results
 
@@ -215,7 +215,7 @@ class RandomXORRequestor(object):
 
 			# xor the random strings together
 			for requestinfo in self.activemirrorinfolist[:-1]:
-				thisbitstring = simplexordatastore.do_xor(thisbitstring, requestinfo['blockbitstringlist'][blocknum])
+				thisbitstring = xordatastore.do_xor(thisbitstring, requestinfo['blockbitstringlist'][blocknum])
 
 			# flip the appropriate bit for the block we want
 			thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocklist[blocknum])
@@ -573,7 +573,7 @@ class RandomXORRequestorChunks(object):
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrorinfolist:
 						if c in rqi['blockchunklist'][-1]:
-							thisbitstring = simplexordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
+							thisbitstring = xordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
 							if rng:
 								del rqi['blockchunklist'][-1][c] #remove the pre-computed random chunk from the packet to send
 
@@ -635,7 +635,7 @@ class RandomXORRequestorChunks(object):
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrorinfolist:
 						if c in rqi['blockchunklist'][-1]:
-							thisbitstring = simplexordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
+							thisbitstring = xordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
 							if rng:
 								del rqi['blockchunklist'][-1][c] #remove the pre-computed random chunk from the packet to send
 
