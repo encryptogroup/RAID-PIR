@@ -45,7 +45,7 @@ import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
-pirversion = "v0.9.0"
+pirversion = "v0.9.1"
 
 # Exceptions...
 class FileNotFound(Exception):
