@@ -815,7 +815,7 @@ def flip_bitstring_bit(bitstring, bitnum):
 
 def flip_array_bit(ba, bitnum):
 	"""flips a bit in an array, 0 = MSB. Works with numpy arrays or byte arrays"""
-	ba[bitnum >> 3] ^= (1<< (7 - (bitnum % 8)))
+	ba[bitnum >> 3] ^= (1 << (7 - (bitnum % 8)))
 	return ba
 
 

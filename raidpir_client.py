@@ -421,6 +421,29 @@ def parse_options():
 	_commandlineoptions.filestoretrieve = remainingargs
 
 
+def start_logging():
+		global total_start
+		total_start = _timer()
+		global _timing_log
+		cur_time = time.strftime("%y%m%d-%H%M%S")
+		cur_time += "_k" + str(_commandlineoptions.numberofmirrors)
+		if _commandlineoptions.redundancy:
+			cur_time += "_r" + str(_commandlineoptions.redundancy)
+		if _commandlineoptions.rng:
+			cur_time += "_R"
+		if _commandlineoptions.parallel:
+			cur_time += "_p"
+
+		_timing_log = open("timing_" + cur_time + ".log", "w")
+		_timing_log.write(cur_time + "\n")
+		_timing_log.write(str(_commandlineoptions.filestoretrieve) + " ")
+		_timing_log.write(str(_commandlineoptions.numberofmirrors) + " ")
+		_timing_log.write(str(_commandlineoptions.redundancy) + " ")
+		_timing_log.write(str(_commandlineoptions.rng) + " ")
+		_timing_log.write(str(_commandlineoptions.parallel) + "\n")
+
+
+
 def main():
 	"""main function with high level control flow"""
 
@@ -453,6 +476,10 @@ def main():
 	if _commandlineoptions.printfiles:
 		print "Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:\n", manifestfilelist
 
+	if _commandlineoptions.timing:
+		_timing_log.write(str(manifestdict['blocksize']) + "\n")
+		_timing_log.write(str(manifestdict['blockcount']) + "\n")
+
 	# ensure the requested files are in there...
 	for filename in _commandlineoptions.filestoretrieve:
 
@@ -469,24 +496,7 @@ if __name__ == '__main__':
 	parse_options()
 
 	if _commandlineoptions.timing:
-		total_start = _timer()
-		global _timing_log
-		cur_time = time.strftime("%y%m%d-%H%M%S")
-		cur_time += "_k" + str(_commandlineoptions.numberofmirrors)
-		if _commandlineoptions.redundancy:
-			cur_time += "_r" + str(_commandlineoptions.redundancy)
-		if _commandlineoptions.rng:
-			cur_time += "_R"
-		if _commandlineoptions.parallel:
-			cur_time += "_p"
-
-		_timing_log = open("timing_" + cur_time + ".log", "w")
-		_timing_log.write(cur_time + "\n")
-		_timing_log.write(str(_commandlineoptions.filestoretrieve) + " ")
-		_timing_log.write(str(_commandlineoptions.numberofmirrors) + " ")
-		_timing_log.write(str(_commandlineoptions.redundancy) + " ")
-		_timing_log.write(str(_commandlineoptions.rng) + " ")
-		_timing_log.write(str(_commandlineoptions.parallel) + "\n")
+		start_logging()
 
 	main()
 
