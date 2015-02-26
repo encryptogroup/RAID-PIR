@@ -45,6 +45,9 @@ import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
+import time
+_timer = time.time
+
 pirversion = "v0.9.1"
 
 # Exceptions...
@@ -1076,12 +1079,3 @@ def nextrandombitsAES(cipher, bitlength):
 	else:
 		pt = bytelength * "\0"
 		return cipher.encrypt(pt)
-
-
-def send_params(socket, params):
-	"""Sends the given parameters to the socket and gets for response"""
-	response = _remote_query_helper_sock(socket, "P" + msgpack.packb(params))
-	if response != 'PARAMS OK':
-		raise ValueError(response)
-
-	return response

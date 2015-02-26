@@ -262,18 +262,20 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				session.sendmessage(self.request, "T" + str(comp_time))
 				comp_time = 0
 
+			#Debug Hello
 			elif requeststring == 'HELLO':
-				# send a reply.
 				session.sendmessage(self.request, "HI!")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
 				# done!
 
 			#the client asked to close the connection
 			elif requeststring == 'Q':
+				comp_time = 0
 				return
 
 			#this happens if the client closed the socket unexpectedly
 			elif requeststring == '':
+				comp_time = 0
 				return
 
 			else:

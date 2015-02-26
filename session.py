@@ -5,13 +5,6 @@
 # message itself.	 The size of a message must be able to be stored in
 # sessionmaxdigits.	 A size of -1 indicates that this side of the connection
 # should be considered closed.
-#
-# Note that the client will block while sending a message, and the receiver
-# will block while recieving a message.
-#
-# While it should be possible to reuse the connectionbased socket for other
-# tasks so long as it does not overlap with the time periods when messages are
-# being sent, this is inadvisable.
 
 class SessionEOF(Exception):
 	pass
@@ -72,11 +65,8 @@ def _sendhelper(socketobj, data):
 		thissent = socketobj.send(data[sentlength:])
 		sentlength = sentlength + thissent
 
-
-
 # send the message
 def sendmessage(socketobj, data):
 	header = str(len(data)) + '\n'
 	_sendhelper(socketobj, header)
-
 	_sendhelper(socketobj, data)

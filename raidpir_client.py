@@ -74,6 +74,10 @@ import simplexorrequestor
 # for basename
 import os.path
 
+# to sleep...
+import time
+_timer = raidpirlib._timer
+
 
 def _request_helper(rxgobj, tid):
 	"""Private helper to get requests. Multiple threads will execute this, each with a unique tid."""
@@ -168,13 +172,24 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 
 	print "Mirrors: ", mirrorinfolist
 
+	if _commandlineoptions.timing:
+		setup_start = _timer()
+
 	# no chunks (regular upPIR / Chor)
 	if redundancy == None:
 
 		# let's set up a requestor object...
-		rxgobj = simplexorrequestor.RandomXORRequestor(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors)
+		rxgobj = simplexorrequestor.RandomXORRequestor(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, _commandlineoptions.timing)
+
+		if _commandlineoptions.timing:
+			setup_time = _timer() - setup_start
+			_timing_log.write(str(len(rxgobj.activemirrorinfolist[0]['blockbitstringlist']))+"\n")
+			_timing_log.write(str(len(rxgobj.activemirrorinfolist[0]['blockbitstringlist']))+"\n")
 
 		print "Blocks to request:", len(rxgobj.activemirrorinfolist[0]['blockbitstringlist'])
+
+		if _commandlineoptions.timing:
+			req_start = _timer()
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
 		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
@@ -186,12 +201,15 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		for mirror in rxgobj.activemirrorinfolist:
 			mirror['rt'].join()
 
-		rxgobj.cleanup()
-
 	else: # chunks
 
 		# let's set up a chunk requestor object...
-		rxgobj = simplexorrequestor.RandomXORRequestorChunks(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, redundancy, rng, parallel)
+		rxgobj = simplexorrequestor.RandomXORRequestorChunks(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, redundancy, rng, parallel, _commandlineoptions.timing)
+
+		if _commandlineoptions.timing:
+			setup_time = _timer() - setup_start
+			_timing_log.write(str(len(rxgobj.activemirrorinfolist[0]['blocksneeded']))+"\n")
+			_timing_log.write(str(len(rxgobj.activemirrorinfolist[0]['blockchunklist']))+"\n")
 
 		print "# Blocks needed:", len(rxgobj.activemirrorinfolist[0]['blocksneeded'])
 
@@ -201,8 +219,11 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		#chunk lengths in BYTE
 		global chunklen
 		global lastchunklen
-		chunklen = manifestdict['blockcount'] / 8 / _commandlineoptions.numberofmirrors
+		chunklen = ( manifestdict['blockcount'] / 8 ) / _commandlineoptions.numberofmirrors
 		lastchunklen = raidpirlib.compute_bitstring_length(manifestdict['blockcount']) - (_commandlineoptions.numberofmirrors-1)*chunklen
+
+		if _commandlineoptions.timing:
+			req_start = _timer()
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
 		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
@@ -214,7 +235,20 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		for mirror in rxgobj.activemirrorinfolist:
 			mirror['rt'].join()
 
-		rxgobj.cleanup()
+	rxgobj.cleanup()
+
+	if _commandlineoptions.timing:
+		req_time = _timer() - req_start
+		recons_time, comptimes, pings = rxgobj.return_timings()
+
+		avg_ping = sum(pings) / _commandlineoptions.numberofmirrors
+		avg_comptime = sum(comptimes) / _commandlineoptions.numberofmirrors
+
+		_timing_log.write(str(setup_time)+ "\n")
+		_timing_log.write(str(req_time)+ "\n")
+		_timing_log.write(str(recons_time)+ "\n")
+		_timing_log.write(str(avg_comptime)+ " " + str(comptimes)+ "\n")
+		_timing_log.write(str(avg_ping)+ " " + str(pings)+ "\n")
 
 
 	# okay, now we have them all. Let's get the returned dict ready.
@@ -339,7 +373,7 @@ def parse_options():
 
 	parser.add_option("-r", "--redundancy", dest="redundancy",
 				type="int", default=None,
-				help="Activates chunks and specifies redundancy (how often they overlap). (default None)")
+				help="Activates chunks and specifies redundancy r (how often they overlap). (default None)")
 
 	parser.add_option("-R", "--rng", action="store_true", dest="rng", default=False,
 				help="Use seed expansion from RNG for latter chunks (default False). Requires -r")
@@ -347,10 +381,19 @@ def parse_options():
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
 				help="Query one block per chunk in parallel (default False). Requires -r")
 
+	parser.add_option("-t", "--timing", action="store_true", dest="timing", default=False,
+				help="Do timing measurements and print them at the end. (default False)")
+
 	# let's parse the args
 	(_commandlineoptions, remainingargs) = parser.parse_args()
 
-	# k>=2
+	# Force the use of a seeded rng (-R) if MB (-p) is used. Temporary, until -p without -R is implemented.
+	if _commandlineoptions.parallel:
+		_commandlineoptions.rng = True
+
+	# sanity check parameters
+
+	# k >= 2
 	if _commandlineoptions.numberofmirrors < 2:
 		print "Mirrors to contact must be > 1"
 		sys.exit(1)
@@ -392,13 +435,11 @@ def main():
 		# ...and write it out if it's okay
 		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
 
-
 	else:
 		# Simply read it in from disk
 		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
 
 		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
-
 
 	# we will check that the files are in the release
 
@@ -423,8 +464,33 @@ def main():
 	if len(_commandlineoptions.filestoretrieve) > 0:
 		request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
 
-
 if __name__ == '__main__':
 	print "RAID-PIR Client", raidpirlib.pirversion
 	parse_options()
+
+	if _commandlineoptions.timing:
+		total_start = _timer()
+		global _timing_log
+		cur_time = time.strftime("%y%m%d-%H%M%S")
+		cur_time += "_k" + str(_commandlineoptions.numberofmirrors)
+		if _commandlineoptions.redundancy:
+			cur_time += "_r" + str(_commandlineoptions.redundancy)
+		if _commandlineoptions.rng:
+			cur_time += "_R"
+		if _commandlineoptions.parallel:
+			cur_time += "_p"
+
+		_timing_log = open("timing_" + cur_time + ".log", "w")
+		_timing_log.write(cur_time + "\n")
+		_timing_log.write(str(_commandlineoptions.filestoretrieve) + " ")
+		_timing_log.write(str(_commandlineoptions.numberofmirrors) + " ")
+		_timing_log.write(str(_commandlineoptions.redundancy) + " ")
+		_timing_log.write(str(_commandlineoptions.rng) + " ")
+		_timing_log.write(str(_commandlineoptions.parallel) + "\n")
+
 	main()
+
+	if _commandlineoptions.timing:
+		ttime = _timer() - total_start
+		_timing_log.write(str(ttime)+ "\n")
+		_timing_log.close()
