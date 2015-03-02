@@ -295,7 +295,9 @@ def service_raidpir_clients(myxordatastore, ip, port):
 	xorserver = ThreadedXORServer((ip, port), ThreadedXORRequestHandler)
 
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
-	threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server").start()
+	t = threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server")
+	t.daemon = True
+	t.start()
 
 
 ################################ Serve via HTTP ###############################
@@ -385,7 +387,7 @@ def parse_options():
 	parser.add_option("", "--httpport", dest="httpport", type="int",
 				default=80, help="Serve HTTP clients on this port (default 80)")
 
-	parser.add_option("", "--mirrorroot", dest="mirrorroot", type="string",
+	parser.add_option("", "--files", dest="files", type="string",
 				metavar="dir", default=".",
 				help="The base directory where all mirror files are located.")
 
@@ -397,9 +399,9 @@ def parse_options():
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
-	parser.add_option("", "--foreground", dest="daemonize", action="store_false",
-				default=True,
-				help="Do not detach from the terminal and run in the background")
+	parser.add_option("", "--daemon", dest="daemonize", action="store_true",
+				default=False,
+				help="Detach from terminal and run in the background")
 
 	parser.add_option("", "--logfile", dest="logfilename",
 				type="string", default="mirror.log",
@@ -467,7 +469,7 @@ def main():
 	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'])
 
 	# now let's put the content in the datastore in preparation to serve it
-	raidpirlib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.mirrorroot)
+	raidpirlib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.files)
 
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')

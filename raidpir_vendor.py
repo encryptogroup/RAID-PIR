@@ -246,8 +246,12 @@ def start_vendor_service(manifestdict, ip, port):
 	# create the handler / server
 	vendorserver = ThreadedVendorServer((ip, port), ThreadedVendorRequestHandler)
 
-	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
-	threading.Thread(target=vendorserver.serve_forever, name="RAID-PIR Vendor server").start()
+	_log('vendor servers started at' + str(ip) + ':' + str(port))
+	print "Vendor Server started at", ip, ":", port
+	print "Manifest contains", len(manifestdict['fileinfolist']), "files in", manifestdict['blockcount'], "blocks of size", manifestdict['blocksize'], "B"
+
+	# and serve forever!
+	vendorserver.serve_forever()
 
 
 ########################### Option parsing and main ###########################
@@ -284,9 +288,9 @@ def parse_options():
 				type="string", default="manifest.dat",
 				help="The manifest file to use (default manifest.dat).")
 
-	parser.add_option("", "--foreground", dest="daemonize", action="store_false",
-				default=True,
-				help="Do not detach from the terminal and run in the background")
+	parser.add_option("", "--daemon", dest="daemonize", action="store_true",
+				default=False,
+				help="Detach from the terminal and run as daemon in the background")
 
 	parser.add_option("", "--logfile", dest="logfilename",
 				type="string", default="vendor.log",
@@ -366,8 +370,6 @@ def main():
 	# first, let's fire up the RAID-PIR server
 	start_vendor_service(manifestdict, vendorip, vendorport)
 
-	_log('vendor servers started at' + str(vendorip) + ':' + str(vendorport))
-	print "Vendor Server started at", vendorip, ":", vendorport
 
 
 if __name__ == '__main__':

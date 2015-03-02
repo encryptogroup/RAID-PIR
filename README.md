@@ -54,7 +54,7 @@ dd@deb:~/workspace/RAID-PIR/test/vendor$ ls ../files/
 1.jpg  1.pdf  2.jpg  2.pdf  3.jpg
 
 dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_create_manifest.py ../files/ 4096 127.0.0.1
-RAID-PIR create manifest v0.9.0
+RAID-PIR create manifest v0.9.2
 Fileinfolist generation done.
 Indexing done ...
 Offset-Dict generated.
@@ -66,15 +66,15 @@ Generated manifest.dat describing xordatastore with 326 4096 Byte blocks.
 
 ### 2. Starting the vendor and mirrors
 
-At this point, We're ready to run the vendor. For testing purposes, it's often useful to run this in the foreground. To do this, use the `--foreground` flag.
+At this point, We're ready to run the vendor.
 
-Command: `python raidpir_vendor.py --foreground`
+Command: `python raidpir_vendor.py`
 
 Example:
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_vendor.py --foreground
-RAID-PIR Vendor v0.9.0
+dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_vendor.py
+RAID-PIR Vendor v0.9.2
 Vendor Server started at 127.0.0.1 : 62293
 ```
 
@@ -83,21 +83,21 @@ Change your terminal to the mirror's directory (such as `../mirror1`).
 
 Each mirror will need to know where to locate the mirror files, what ports to use, and a copy of the manifest file.
 
-Command: `python raidpir_mirror.py --ip <MIRROR-IP> --port <MIRROR-PORT> --foreground --mirrorroot <DIR> --retrievemanifestfrom <VENDOR-IP>`
+Command: `python raidpir_mirror.py --ip <MIRROR-IP> --port <MIRROR-PORT> --files <DIR> --retrievemanifestfrom <VENDOR-IP>`
 
 Example:
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/mirror1$ python raidpir_mirror.py --ip 127.0.0.1 --port 62001 --foreground --mirrorroot ../files/ --retrievemanifestfrom 127.0.0.1
-RAID-PIR mirror v0.9.0
+dd@deb:~/workspace/RAID-PIR/test/mirror1$ python raidpir_mirror.py --ip 127.0.0.1 --port 62001 --files ../files/ --retrievemanifestfrom 127.0.0.1
+RAID-PIR mirror v0.9.2
 Mirror Server started at 127.0.0.1 : 62001
 ```
 
 We can run another mirror instance in a different terminal. You will need to change to another directory and listen on a different port when you're on a single machine.
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --foreground --mirrorroot ../files/ --retrievemanifestfrom 127.0.0.1
-RAID-PIR mirror v0.9.0
+dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --files ../files/ --retrievemanifestfrom 127.0.0.1
+RAID-PIR mirror v0.9.2
 Mirror Server started at 127.0.0.1 : 62002
 ```
 
@@ -113,7 +113,7 @@ Command: `python raidpir_client.py [--retrievemanifestfrom <IP:PORT>] <FILENAME>
 Example:
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/client$ python raidpir_client.py --retrievemanifestfrom 127.0.0.1:62293 1.jpg
-RAID-PIR Client v0.9.0
+RAID-PIR Client v0.9.2
 Mirrors:  [{'ip': '127.0.0.1', 'port': 62002}, {'ip': '127.0.0.1', 'port': 62003}, {'ip': '127.0.0.1', 'port': 62001}]
 Blocks to request: 25
 wrote 1.jpg
@@ -132,9 +132,9 @@ Please see [our RAID-PIR paper](http://encrypto.de/papers/DHS14.pdf) for a detai
 
 ### 4. Restarting the Mirrors or Vendor
 
-You can try to use CTRL-C or CTRL-Z on some OSes to end the RAID-PIR processes. On other OSes, this will raise an exception but will not exit. Also, check your process manager and see if you really terminated the processes. Sometimes this doesn't work due to the multi-threading in RAID-PIR.
+You should be able to use Ctrl+C to end RAID-PIR processes. Sometimes this might not work due to the multi-threading in RAID-PIR. If in doubt, check your process manager and see if you really terminated all RAID-PIR processes.
 
-A quick and dirty solution is to end all python processes using `killall python` (**Warning:** This will also end all other python processes, not just RAID-PIR!).
+A quick-and-dirty solution to this problem is to end all python processes using `killall python` (**Warning:** This will also end all other python processes, not just RAID-PIR!).
 In case RAID-PIR still won't terminate properly, try `killall -9 python` (**Warning:** This will most definitely also end all other python processes!). If you know how to solve this more elegantly, please let me know.
 
 You can then re-run the code and your changes will be taken into account.

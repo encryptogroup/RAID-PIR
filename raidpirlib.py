@@ -48,7 +48,7 @@ from Crypto.Util import Counter
 import time
 _timer = time.time
 
-pirversion = "v0.9.1"
+pirversion = "v0.9.2"
 
 # Exceptions...
 class FileNotFound(Exception):
