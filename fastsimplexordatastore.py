@@ -82,7 +82,7 @@ class XORDatastore(object):
 
 
 		self.numberofblocks = num_blocks
-		self.sizeofblocks = block_size
+		self.sizeofblocks = block_size #in byte
 
 		self.ds = fastsimplexordatastore_c.Allocate(block_size, num_blocks)
 
@@ -138,7 +138,7 @@ class XORDatastore(object):
 		if type(bitstring) != str:
 			raise TypeError("bitstring must be a string")
 
-		if len(bitstring) != math.ceil(self.numberofblocks * num_strings / 8):
+		if len(bitstring) != math.ceil(self.numberofblocks / 8.0) * num_strings :
 			raise TypeError("bitstring is not of the correct length")
 
 		return fastsimplexordatastore_c.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
