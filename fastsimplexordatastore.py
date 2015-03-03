@@ -96,7 +96,7 @@ class XORDatastore(object):
 		<Arguments>
 			bitstring: a string of bits that indicates what to XOR.   The length
 								 of this string must be ceil(numberofblocks / 8.0).   Extra
-								 bits are ignored (e.g. if are 10 blocks, the last
+								 bits are ignored (e.g. if there are 10 blocks, the last
 								 six bits are ignored).
 
 		<Exceptions>
@@ -112,8 +112,36 @@ class XORDatastore(object):
 		if len(bitstring) != math.ceil(self.numberofblocks/8.0):
 			raise TypeError("bitstring is not of the correct length")
 
-
 		return fastsimplexordatastore_c.Produce_Xor_From_Bitstring(self.ds, bitstring)
+
+
+	def produce_xor_from_multiple_bitstrings(self, bitstring, num_strings):
+		"""
+		<Purpose>
+			Returns multiple XORed block from an XORdatastore. It will always return
+			a string of the size of the datastore blocks times num_strings
+
+		<Arguments>
+			bitstring: concatenated string of bits that indicates what to XOR. The length
+								 of this string must be numberofblocks * num_strings / 8.   Extra
+								 bits are ignored (e.g. if there are 10 blocks, the last
+								 six bits are ignored).
+			num_strings: the number of requests in bitstring
+
+		<Exceptions>
+			TypeError is raised if the bitstring is invalid
+
+		<Returns>
+			The XORed block.
+
+		"""
+		if type(bitstring) != str:
+			raise TypeError("bitstring must be a string")
+
+		if len(bitstring) != math.ceil(self.numberofblocks * num_strings / 8):
+			raise TypeError("bitstring is not of the correct length")
+
+		return fastsimplexordatastore_c.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
 
 
 

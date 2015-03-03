@@ -2,8 +2,9 @@
 
 import fastsimplexordatastore
 
-size = 64
-letterxordatastore = fastsimplexordatastore.XORDatastore(size, 16)
+size = 64 # block size in Byte
+num_blocks = 16 # number of blocks
+letterxordatastore = fastsimplexordatastore.XORDatastore(size, num_blocks)
 
 startpos = 0
 for char in range(ord("A"), ord("Q")):
@@ -20,6 +21,15 @@ xorresult = letterxordatastore.produce_xor_from_bitstring(bitstring)
 
 assert(xorresult[0] == 'R')
 
+# let's create a bitstring that uses A, C, and P.
+bitstring = chr(int('10100000', 2)) + chr(int('00000001',2)) + chr(int('10000000', 2)) + chr(int('00000000',2)) + chr(int('01001110', 2)) + chr(int('00000001',2))
+xorresult = letterxordatastore.produce_xor_from_multiple_bitstrings(bitstring, 3)
+
+assert len(xorresult) == 3*size
+assert xorresult[0] == 'R'
+assert xorresult[64] == 'A'
+assert xorresult[128] == 'V'
+
 letterxordatastore.set_data(10,"Hello there")
 
 mystring = letterxordatastore.get_data(9,13)
@@ -35,6 +45,8 @@ assert(mystring == "Hello there")
 
 # let's try to read the last bytes of data
 mystring = letterxordatastore.get_data(size*15,size)
+
+
 
 
 try:
@@ -96,3 +108,5 @@ for pos in xrange(len(aa)):
 	result = result + chr(ord(aa[pos]) ^ ord(bb[pos]))
 
 assert(result == cc)
+
+print "no news is good news. everything OK."

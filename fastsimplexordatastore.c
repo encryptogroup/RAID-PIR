@@ -27,9 +27,7 @@ static XORDatastore xordatastoretable[STARTING_XORDATASTORE_TABLESIZE];
 static inline void XOR_fullblocks(uint64_t *dest, uint64_t *data, long count) {
 	register long i;
 	for (i=0; i<count; i++) {
-		*dest ^= *data;
-		dest++;
-		data++;
+		*dest++ ^= *data++;
 	}
 }
 
@@ -38,9 +36,7 @@ static inline void XOR_fullblocks(uint64_t *dest, uint64_t *data, long count) {
 static inline void XOR_byteblocks(char *dest, const char *data, long count) {
 	register long i;
 	for (i=0; i<count; i++) {
-		*dest ^= *data;
-		dest++;
-		data++;
+		*dest++ ^= *data++;
 	}
 }
 
@@ -82,9 +78,7 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 			xordatastoretable[i].sizeofablock = block_size;
 
 			// I allocate a little bit extra so that I can DWORD align it
-			xordatastoretable[i].raw_datastore = malloc(num_blocks * block_size + sizeof(uint64_t));
-			// Zero it out
-			bzero(xordatastoretable[i].raw_datastore, num_blocks * block_size + sizeof(uint64_t));
+			xordatastoretable[i].raw_datastore = calloc(1, num_blocks * block_size + sizeof(uint64_t));
 
 			// and align it...
 			xordatastoretable[i].datastore = (uint64_t *) dword_align(xordatastoretable[i].raw_datastore);
@@ -120,6 +114,43 @@ static PyObject *Allocate(PyObject *module, PyObject *args) {
 
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
+static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, unsigned int numstrings, uint64_t *resultbuffer) {
+	long one_bit_string_length = bit_string_length / numstrings; // convert bytes to bits
+	long remaininglength = one_bit_string_length * 8;
+	char *current_bit_string_pos;
+	current_bit_string_pos = bit_string;
+	long long offset = 0;
+	int block_size = xordatastoretable[ds].sizeofablock;
+	char *datastorebase;
+	datastorebase = (char *) xordatastoretable[ds].datastore;
+
+	int dwords_per_block = block_size / sizeof(uint64_t);
+
+	unsigned char bit = 128;
+	unsigned int i;
+
+	while (remaininglength > 0) {
+
+		for(i = 0; i < numstrings; i++){
+			if ( *(current_bit_string_pos + one_bit_string_length * i) & bit) {
+				XOR_fullblocks(resultbuffer + dwords_per_block * i, (uint64_t *) (datastorebase + offset), dwords_per_block);
+			}
+		}
+
+		offset += block_size;
+		bit /= 2;
+		remaininglength -=1;
+		if (bit == 0) {
+			bit = 128;
+			current_bit_string_pos++;
+		}
+	}
+}
+
+
+
+// This function needs to be fast.   It is a good candidate for releasing Python's GIL
+
 static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, uint64_t *resultbuffer) {
 	long remaininglength = bit_string_length * 8;  // convert bytes to bits
 	char *current_bit_string_pos;
@@ -131,11 +162,11 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 
 	int dwords_per_block = block_size / sizeof(uint64_t);
 
-	int bit = 128;
+	unsigned char bit = 128;
 
-	while (remaininglength >0) {
+	while (remaininglength > 0) {
 		if ((*current_bit_string_pos) & bit) {
-			XOR_fullblocks(resultbuffer, (uint64_t *) (datastorebase+offset), dwords_per_block);
+			XOR_fullblocks(resultbuffer, (uint64_t *) (datastorebase + offset), dwords_per_block);
 		}
 		offset += block_size;
 		bit /= 2;
@@ -170,9 +201,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	}
 
 	// Let's prepare a place to put this...
-	raw_resultbuffer = malloc(xordatastoretable[ds].sizeofablock+sizeof(uint64_t));
-	// ...and zero it out...
-	bzero(raw_resultbuffer, xordatastoretable[ds].sizeofablock+sizeof(uint64_t));
+	raw_resultbuffer = calloc(1, xordatastoretable[ds].sizeofablock + sizeof(uint64_t));
 
 	// ... now let's get a DWORD aligned offset
 	resultbuffer = (uint64_t *) dword_align(raw_resultbuffer);
@@ -184,6 +213,50 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 
 	// okay, let's put it in a buffer
 	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
+
+	// clear the buffer
+	free(raw_resultbuffer);
+
+	return return_str_obj;
+}
+
+
+// Does XORs given multiple bit strings. This is the common case and so should be optimized.
+
+// Python Wrapper object
+static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
+	datastore_descriptor ds;
+	int bitstringlength;
+	unsigned int numstrings;
+	char *bitstringbuffer;
+	char *raw_resultbuffer;
+	uint64_t *resultbuffer;
+
+
+	if (!PyArg_ParseTuple(args, "is#I", &ds, &bitstringbuffer, &bitstringlength, &numstrings)) {
+		// Incorrect args...
+		return NULL;
+	}
+
+
+
+	// Is the ds valid?
+	if (!is_table_entry_used(ds)) {
+		PyErr_SetString(PyExc_ValueError, "Bad index for Produce_Xor_From_Bitstring");
+		return NULL;
+	}
+
+	// Let's prepare a place to put this...
+	raw_resultbuffer = calloc(1, xordatastoretable[ds].sizeofablock * numstrings + sizeof(uint64_t));
+
+	// ... now let's get a DWORD aligned offset
+	resultbuffer = (uint64_t *) dword_align(raw_resultbuffer);
+
+	// Let's actually calculate this!
+	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer);
+
+	// okay, let's put it in a buffer
+	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
 
 	// clear the buffer
 	free(raw_resultbuffer);
@@ -388,6 +461,7 @@ static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 	{"GetData", GetData, METH_VARARGS, "Reads data out of a datastore."},
 	{"SetData", SetData, METH_VARARGS, "Puts data into the datastore."},
 	{"Produce_Xor_From_Bitstring", Produce_Xor_From_Bitstring, METH_VARARGS, "Extract XOR from datastore."},
+	{"Produce_Xor_From_Bitstrings", Produce_Xor_From_Bitstrings, METH_VARARGS, "Extract XORs from datastore."},
 	{"do_xor", do_xor, METH_VARARGS, "does the XOR of two equal length strings."},
 	{NULL, NULL, 0, NULL}
 };
