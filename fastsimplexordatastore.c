@@ -23,7 +23,6 @@ static int xordatastoreinited = 0;
 static XORDatastore xordatastoretable[STARTING_XORDATASTORE_TABLESIZE];
 
 
-
 // Helper
 static inline void XOR_fullblocks(uint64_t *dest, uint64_t *data, long count) {
 	register long i;
@@ -33,6 +32,7 @@ static inline void XOR_fullblocks(uint64_t *dest, uint64_t *data, long count) {
 		data++;
 	}
 }
+
 
 // Helper
 static inline void XOR_byteblocks(char *dest, const char *data, long count) {
@@ -45,9 +45,7 @@ static inline void XOR_byteblocks(char *dest, const char *data, long count) {
 }
 
 
-
-// Moves ptr to the next DWORD aligned address.   If ptr is DWORD aligned,
-// return ptr.
+// Moves ptr to the next DWORD aligned address.   If ptr is DWORD aligned, return ptr.
 static inline char *dword_align(char *ptr) {
 	return ptr + (sizeof(uint64_t) - (((long)ptr) % sizeof(uint64_t))) % sizeof(uint64_t);
 }
@@ -57,8 +55,6 @@ static inline char *dword_align(char *ptr) {
 static int is_table_entry_used(int i) {
 	return (xordatastoretable[i].raw_datastore != NULL);
 }
-
-
 
 
 // This allocates memory and stores the size / num_blocks for
@@ -96,7 +92,7 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 		}
 	}
 
-	// The table is full!   I really should expand it...
+	// The table is full! I really should expand it...
 	printf("Internal Error: I need to expand the table size (unimplemented)\n");
 	return -1;
 }
@@ -118,21 +114,11 @@ static PyObject *Allocate(PyObject *module, PyObject *args) {
 		return NULL;
 	}
 
-
 	return Py_BuildValue("i",allocate(blocksize, numblocks));
-
 }
 
 
-
-
-
-
-
-
-
-// This function needs to be fast.   It is a good candidate for releasing
-// Python's GIL
+// This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
 static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, uint64_t *resultbuffer) {
 	long remaininglength = bit_string_length * 8;  // convert bytes to bits
@@ -146,7 +132,6 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 	int dwords_per_block = block_size / sizeof(uint64_t);
 
 	int bit = 128;
-
 
 	while (remaininglength >0) {
 		if ((*current_bit_string_pos) & bit) {
@@ -163,9 +148,7 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 }
 
 
-
-// Does XORs given a bit string.   This is the common case and so should be
-// optimized.
+// Does XORs given a bit string. This is the common case and so should be optimized.
 
 // Python Wrapper object
 static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
@@ -209,12 +192,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 }
 
 
-
-
-
-
-// This is used to populate the datastore.   It can also be used to add
-// memoization data.
+// This is used to populate the datastore. It can also be used to add memorization data.
 
 // Python wrapper (only)...
 static PyObject *SetData(PyObject *module, PyObject *args) {
@@ -246,9 +224,6 @@ static PyObject *SetData(PyObject *module, PyObject *args) {
 	return Py_BuildValue("");
 
 }
-
-
-
 
 
 // Returns the data stored at an offset.   Note that we move away from
@@ -283,8 +258,6 @@ static PyObject *GetData(PyObject *module, PyObject *args) {
 }
 
 
-
-
 // Cleans up the datastore.   I don't know when or why this would be used, but
 // it is included for completeness.
 static void deallocate(datastore_descriptor ds){
@@ -301,7 +274,6 @@ static void deallocate(datastore_descriptor ds){
 }
 
 
-
 // Python wrapper...
 static PyObject *Deallocate(PyObject *module, PyObject *args) {
 	datastore_descriptor ds;
@@ -314,10 +286,7 @@ static PyObject *Deallocate(PyObject *module, PyObject *args) {
 	deallocate(ds);
 
 	return Py_BuildValue("");
-
 }
-
-
 
 
 // I just have this around for testing
@@ -413,7 +382,6 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 }
 
 
-
 static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 	{"Allocate", Allocate, METH_VARARGS, "Allocate a datastore."},
 	{"Deallocate", Deallocate, METH_VARARGS, "Deallocate a datastore."},
@@ -428,5 +396,3 @@ static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 PyMODINIT_FUNC initfastsimplexordatastore_c(void) {
 	Py_InitModule("fastsimplexordatastore_c", MyFastSimpleXORDatastoreMethods);
 }
-
-
