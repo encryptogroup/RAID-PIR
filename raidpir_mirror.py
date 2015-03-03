@@ -111,15 +111,13 @@ class ThreadedXORServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 	def handle(self):
-		global chunknumbers
-		global k
-		global r
-		global chunklen
-		global lastchunklen
-		global cipher
+
 		comp_time = 0
+		batchrequests = 0
+		parallel = False
 
 		requeststring = '0'
+		xorstrings = ""
 
 		while requeststring != 'Q':
 			# read the request from the socket...
@@ -140,19 +138,22 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				if len(bitstring) != expectedbitstringlength:
 					# Invalid request length...
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request with length: "+str(len(bitstring)))
-
 					session.sendmessage(self.request, 'Invalid request length')
 					return
 
-				# Now let's process this...
-				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+				if not batch:
+					# Now let's process this...
+					xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+					comp_time = comp_time + _timer() - start_time
 
-				comp_time = comp_time + _timer() - start_time
+					# and send the reply.
+					session.sendmessage(self.request, xoranswer)
+					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
-				# and send the reply.
-				session.sendmessage(self.request, xoranswer)
-				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
-
+				else:
+					xorstrings += bitstring
+					batchrequests = batchrequests + 1
+					comp_time = comp_time + _timer() - start_time
 
 				# done!
 
@@ -164,14 +165,19 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen)
 
-				# Now let's process this...
-				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+				if not batch:
+					# Now let's process this...
+					xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+					comp_time = comp_time + _timer() - start_time
 
-				comp_time = comp_time + _timer() - start_time
+					# and send the reply.
+					session.sendmessage(self.request, xoranswer)
+					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
-				# and send the reply.
-				session.sendmessage(self.request, xoranswer)
-				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+				else:
+					xorstrings += bitstring
+					batchrequests = batchrequests + 1
+					comp_time = comp_time + _timer() - start_time
 
 				#done!
 
@@ -194,18 +200,24 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
 
-				# Now let's process this...
-				xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+				if not batch:
+					# Now let's process this...
+					xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
+					comp_time = comp_time + _timer() - start_time
 
-				comp_time = comp_time + _timer() - start_time
+					# and send the reply.
+					session.sendmessage(self.request, xoranswer)
+					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
-				# and send the reply.
-				session.sendmessage(self.request, xoranswer)
-				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+				else:
+					xorstrings += bitstring
+					batchrequests = batchrequests + 1
+					comp_time = comp_time + _timer() - start_time
 
 				#done!
 
 			elif requeststring.startswith('M'):
+				parallel = True
 
 				payload = requeststring[len('M'):]
 
@@ -224,14 +236,21 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
 
-				result = {}
-				for c in chunknumbers:
-					result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
+				if not batch:
 
-				comp_time = comp_time + _timer() - start_time
+					result = {}
+					for c in chunknumbers:
+						result[c] = _global_myxordatastore.produce_xor_from_bitstring(bitstrings[c])
 
-				# and send the reply.
-				session.sendmessage(self.request, msgpack.packb(result))
+					comp_time = comp_time + _timer() - start_time
+
+					# and send the reply.
+					session.sendmessage(self.request, msgpack.packb(result))
+				else:
+					for c in chunknumbers:
+						xorstrings += bitstrings[c]
+					batchrequests = batchrequests + 1
+					comp_time = comp_time + _timer() - start_time
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
 				#done!
@@ -247,6 +266,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				r = params['r']
 				chunklen = params['cl']
 				lastchunklen = params['lcl']
+				batch = params['b']
 
 				if 's' in params:
 					cipher = raidpirlib.initAES(params['s'])
@@ -256,6 +276,29 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
 
 				#done!
+
+			#Xor Requests send, trigger the batch XOR manually
+			elif requeststring == 'B':
+				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
+				comp_time = comp_time + _timer() - start_time
+				blocksize = _global_myxordatastore.sizeofblocks
+
+				if parallel:
+					i = 0
+					for _ in xrange(batchrequests):
+						result = {}
+						for c in chunknumbers:
+							result[c] = xoranswer[i*blocksize : (i+1)*blocksize]
+							i = i + 1
+
+						session.sendmessage(self.request, msgpack.packb(result))
+
+				else:
+					for i in xrange(batchrequests):
+						session.sendmessage(self.request, xoranswer[i*blocksize : (i+1)*blocksize])
+
+				batchrequests = 0
+				xorstrings = ""
 
 			#Timing Request
 			elif requeststring == 'T':

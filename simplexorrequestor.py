@@ -176,7 +176,7 @@ class RandomXORRequestor(Requestor):
 	"""
 
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, timing, pollinginterval=.1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, batch, timing, pollinginterval=.1):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
@@ -239,6 +239,7 @@ class RandomXORRequestor(Requestor):
 			params['r'] = privacythreshold # r is irrelevant here, thus fixed to k
 			params['cl'] = 1 # chunk length, here fixed to 1
 			params['lcl'] = 1 # last chunk length, here fixed to 1
+			params['b'] = batch
 
 			#send the params, rcvlet will check response
 			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "P" + msgpack.packb(params))
@@ -440,7 +441,7 @@ class RandomXORRequestor(Requestor):
 
 class RandomXORRequestorChunks(Requestor):
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, timing, pollinginterval=.1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, batch, timing, pollinginterval=.1):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
@@ -522,6 +523,8 @@ class RandomXORRequestorChunks(Requestor):
 			params['r'] = redundancy
 			params['cl'] = self.chunklen
 			params['lcl'] = self.lastchunklen
+			params['b'] = batch
+
 			if rng:
 				params['s'] = thisrequestinfo['seed']
 

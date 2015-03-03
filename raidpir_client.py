@@ -71,6 +71,8 @@ import threading
 
 import simplexorrequestor
 
+import session
+
 # for basename
 import os.path
 
@@ -102,6 +104,10 @@ def _request_helper(rxgobj, tid):
 
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest(tid)
+
+	# for now, trigger batch processing manually after all requests have been sent
+	if _commandlineoptions.batch:
+		session.sendmessage(socket, 'B')
 
 	# and that's it!
 	return
@@ -138,6 +144,10 @@ def _request_helper_chunked(rxgobj, tid):
 
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest(tid)
+
+	# for now, trigger batch processing manually after all requests have been sent
+	if _commandlineoptions.batch:
+		session.sendmessage(socket, 'B')
 
 	# and that's it!
 	return
@@ -179,7 +189,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 	if redundancy == None:
 
 		# let's set up a requestor object...
-		rxgobj = simplexorrequestor.RandomXORRequestor(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, _commandlineoptions.timing)
+		rxgobj = simplexorrequestor.RandomXORRequestor(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, _commandlineoptions.batch, _commandlineoptions.timing)
 
 		if _commandlineoptions.timing:
 			setup_time = _timer() - setup_start
@@ -204,7 +214,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 	else: # chunks
 
 		# let's set up a chunk requestor object...
-		rxgobj = simplexorrequestor.RandomXORRequestorChunks(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, redundancy, rng, parallel, _commandlineoptions.timing)
+		rxgobj = simplexorrequestor.RandomXORRequestorChunks(mirrorinfolist, requestedblocklist, manifestdict, _commandlineoptions.numberofmirrors, redundancy, rng, parallel, _commandlineoptions.batch, _commandlineoptions.timing)
 
 		if _commandlineoptions.timing:
 			setup_time = _timer() - setup_start
@@ -381,6 +391,9 @@ def parse_options():
 	parser.add_option("-p", "--parallel", action="store_true", dest="parallel", default=False,
 				help="Query one block per chunk in parallel (default False). Requires -r")
 
+	parser.add_option("-b", "--batch", action="store_true", dest="batch", default=False,
+				help="Request the mirror to do computations in a batch. (default False)")
+
 	parser.add_option("-t", "--timing", action="store_true", dest="timing", default=False,
 				help="Do timing measurements and print them at the end. (default False)")
 
@@ -433,6 +446,8 @@ def start_logging():
 			cur_time += "_R"
 		if _commandlineoptions.parallel:
 			cur_time += "_p"
+		if _commandlineoptions.batch:
+			cur_time += "_b"
 
 		_timing_log = open("timing_" + cur_time + ".log", "w")
 		_timing_log.write(cur_time + "\n")
@@ -440,7 +455,8 @@ def start_logging():
 		_timing_log.write(str(_commandlineoptions.numberofmirrors) + " ")
 		_timing_log.write(str(_commandlineoptions.redundancy) + " ")
 		_timing_log.write(str(_commandlineoptions.rng) + " ")
-		_timing_log.write(str(_commandlineoptions.parallel) + "\n")
+		_timing_log.write(str(_commandlineoptions.parallel) + " ")
+		_timing_log.write(str(_commandlineoptions.batch) + "\n")
 
 
 
