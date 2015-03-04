@@ -397,6 +397,10 @@ def parse_options():
 	parser.add_option("-t", "--timing", action="store_true", dest="timing", default=False,
 				help="Do timing measurements and print them at the end. (default False)")
 
+	parser.add_option("-c", "--comment", type="string", dest="comment", default="",
+				help="Debug comment on this run, used to name timing log file.")
+
+
 	# let's parse the args
 	(_commandlineoptions, remainingargs) = parser.parse_args()
 
@@ -435,21 +439,22 @@ def parse_options():
 
 
 def start_logging():
-		global total_start
-		total_start = _timer()
 		global _timing_log
-		cur_time = time.strftime("%y%m%d-%H%M%S")
-		cur_time += "_k" + str(_commandlineoptions.numberofmirrors)
-		if _commandlineoptions.redundancy:
-			cur_time += "_r" + str(_commandlineoptions.redundancy)
-		if _commandlineoptions.rng:
-			cur_time += "_R"
-		if _commandlineoptions.parallel:
-			cur_time += "_p"
-		if _commandlineoptions.batch:
-			cur_time += "_b"
+		global total_start
 
-		_timing_log = open("timing_" + cur_time + ".log", "w")
+		logfilename = time.strftime("%y%m%d") + "_" + _commandlineoptions.comment
+		logfilename += "_k" + str(_commandlineoptions.numberofmirrors)
+		if _commandlineoptions.redundancy:
+			logfilename += "_r" + str(_commandlineoptions.redundancy)
+		if _commandlineoptions.rng:
+			logfilename += "_R"
+		if _commandlineoptions.parallel:
+			logfilename += "_p"
+		if _commandlineoptions.batch:
+			logfilename += "_b"
+
+		cur_time = time.strftime("%y%m%d-%H%M%S")
+		_timing_log = open("timing_" + logfilename + ".log", "a")
 		_timing_log.write(cur_time + "\n")
 		_timing_log.write(str(_commandlineoptions.filestoretrieve) + " ")
 		_timing_log.write(str(_commandlineoptions.numberofmirrors) + " ")
@@ -457,6 +462,9 @@ def start_logging():
 		_timing_log.write(str(_commandlineoptions.rng) + " ")
 		_timing_log.write(str(_commandlineoptions.parallel) + " ")
 		_timing_log.write(str(_commandlineoptions.batch) + "\n")
+
+
+		total_start = _timer()
 
 
 
