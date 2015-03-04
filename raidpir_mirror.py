@@ -279,11 +279,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 			#Xor Requests send, trigger the batch XOR manually
 			elif requeststring == 'B':
-				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
-				comp_time = comp_time + _timer() - start_time
 				blocksize = _global_myxordatastore.sizeofblocks
 
 				if parallel:
+					xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
+					comp_time = comp_time + _timer() - start_time
 					i = 0
 					for _ in xrange(batchrequests):
 						result = {}
@@ -294,6 +294,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 						session.sendmessage(self.request, msgpack.packb(result))
 
 				else:
+					xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests)
+					comp_time = comp_time + _timer() - start_time
 					for i in xrange(batchrequests):
 						session.sendmessage(self.request, xoranswer[i*blocksize : (i+1)*blocksize])
 
