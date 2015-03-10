@@ -17,7 +17,6 @@
 
 	For more technical explanation, please see the paper.
 
-
 <Options>
 	See below...
 """
@@ -102,6 +101,56 @@ def _send_mirrorinfo():
 	else:
 		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport'])
 
+
+#################### Batch Answer Thread ######################
+def BatchAnswer(parallel, chunknumbers, sock):
+	global _batchrequests
+	global _xorstrings
+	global _finish
+	global _batch_comp_time
+
+	blocksize = _global_myxordatastore.sizeofblocks
+	_batch_comp_time = 0;
+
+	# while a client is connected
+	while not _finish:
+
+		# wait for signal to start
+		_batchevent.wait()
+
+		# create local copies and reset global values
+		with _batchlock:
+			batchrequests = _batchrequests
+			xorstrings = _xorstrings
+			_batchrequests = 0
+			_xorstrings = ""
+
+		if batchrequests == 0:
+			# all request answered, remove flag and wait/return
+			_batchevent.clear()
+
+		else: # answer requests
+			start_time = _timer()
+
+			if parallel:
+				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
+				_batch_comp_time = _batch_comp_time + _timer() - start_time
+				i = 0
+				for _ in xrange(batchrequests):
+					result = {}
+					for c in chunknumbers:
+						result[c] = xoranswer[i*blocksize : (i+1)*blocksize]
+						i = i + 1
+
+					session.sendmessage(sock, msgpack.packb(result))
+
+			else:
+				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests)
+				_batch_comp_time = _batch_comp_time + _timer() - start_time
+				for i in xrange(batchrequests):
+					session.sendmessage(sock, xoranswer[i*blocksize : (i+1)*blocksize])
+
+
 ############################### Serve via RAID-PIR ###############################
 
 # I don't need to change this much, I think...
@@ -112,12 +161,19 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 	def handle(self):
 
+		global _batchrequests
+		global _xorstrings
+		global _finish
+		global _batch_comp_time
+
+		_finish = False
 		comp_time = 0
-		batchrequests = 0
+		_batch_comp_time = 0
+		_batchrequests = 0
+		_xorstrings = ""
 		parallel = False
 
 		requeststring = '0'
-		xorstrings = ""
 
 		while requeststring != 'Q':
 			# read the request from the socket...
@@ -139,6 +195,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					# Invalid request length...
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request with length: "+str(len(bitstring)))
 					session.sendmessage(self.request, 'Invalid request length')
+					_finish = True
+					_batchevent.set()
 					return
 
 				if not batch:
@@ -146,14 +204,18 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					xoranswer = _global_myxordatastore.produce_xor_from_bitstring(bitstring)
 					comp_time = comp_time + _timer() - start_time
 
-					# and send the reply.
+					# and immediately send the reply.
 					session.sendmessage(self.request, xoranswer)
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
 				else:
-					xorstrings += bitstring
-					batchrequests = batchrequests + 1
-					comp_time = comp_time + _timer() - start_time
+
+					with _batchlock:
+						_xorstrings += bitstring
+						_batchrequests = _batchrequests + 1
+
+					# notify batch thread
+					_batchevent.set()
 
 				# done!
 
@@ -175,9 +237,12 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
 				else:
-					xorstrings += bitstring
-					batchrequests = batchrequests + 1
-					comp_time = comp_time + _timer() - start_time
+					with _batchlock:
+						_xorstrings += bitstring
+						_batchrequests = _batchrequests + 1
+
+					# notify batch thread
+					_batchevent.set()
 
 				#done!
 
@@ -210,9 +275,12 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 
 				else:
-					xorstrings += bitstring
-					batchrequests = batchrequests + 1
-					comp_time = comp_time + _timer() - start_time
+					with _batchlock:
+						_xorstrings += bitstring
+						_batchrequests = _batchrequests + 1
+
+					# notify batch thread
+					_batchevent.set()
 
 				#done!
 
@@ -247,12 +315,15 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					# and send the reply.
 					session.sendmessage(self.request, msgpack.packb(result))
 				else:
-					for c in chunknumbers:
-						xorstrings += bitstrings[c]
-					batchrequests = batchrequests + 1
-					comp_time = comp_time + _timer() - start_time
-				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
+					with _batchlock:
+						for c in chunknumbers:
+							_xorstrings += bitstrings[c]
+						_batchrequests = _batchrequests + 1
 
+					# notify batch thread
+					_batchevent.set()
+
+				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 				#done!
 
 			elif requeststring.startswith('P'):
@@ -267,45 +338,27 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				chunklen = params['cl']
 				lastchunklen = params['lcl']
 				batch = params['b']
+				parallel = params['p']
 
 				if 's' in params:
 					cipher = raidpirlib.initAES(params['s'])
 
+				if batch:
+					# create batch xor thread
+					t = threading.Thread(target=BatchAnswer, args=[parallel, chunknumbers, self.request], name="RAID-PIR Batch XOR")
+					t.daemon = True
+					t.start()
+
 				# and send the reply.
 				session.sendmessage(self.request, "PARAMS OK")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
-
 				#done!
-
-			#Xor Requests send, trigger the batch XOR manually
-			elif requeststring == 'B':
-				blocksize = _global_myxordatastore.sizeofblocks
-
-				if parallel:
-					xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
-					comp_time = comp_time + _timer() - start_time
-					i = 0
-					for _ in xrange(batchrequests):
-						result = {}
-						for c in chunknumbers:
-							result[c] = xoranswer[i*blocksize : (i+1)*blocksize]
-							i = i + 1
-
-						session.sendmessage(self.request, msgpack.packb(result))
-
-				else:
-					xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests)
-					comp_time = comp_time + _timer() - start_time
-					for i in xrange(batchrequests):
-						session.sendmessage(self.request, xoranswer[i*blocksize : (i+1)*blocksize])
-
-				batchrequests = 0
-				xorstrings = ""
 
 			#Timing Request
 			elif requeststring == 'T':
-				session.sendmessage(self.request, "T" + str(comp_time))
+				session.sendmessage(self.request, "T" + str(comp_time + _batch_comp_time))
 				comp_time = 0
+				_batch_comp_time = 0
 
 			#Debug Hello
 			elif requeststring == 'HELLO':
@@ -316,11 +369,15 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 			#the client asked to close the connection
 			elif requeststring == 'Q':
 				comp_time = 0
+				_finish = True
+				_batchevent.set()
 				return
 
 			#this happens if the client closed the socket unexpectedly
 			elif requeststring == '':
 				comp_time = 0
+				_finish = True
+				_batchevent.set()
 				return
 
 			else:
@@ -328,6 +385,8 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" Invalid request type starts:'"+requeststring[:5]+"'")
 
 				session.sendmessage(self.request, 'Invalid request type')
+				_finish = True
+				_batchevent.set()
 				return
 
 
@@ -486,7 +545,10 @@ def parse_options():
 def main():
 	global _global_myxordatastore
 	global _global_manifestdict
-
+	global _batchlock
+	global _batchevent
+	global _xorstrings
+	global _batchrequests
 
 	# If we were asked to retrieve the mainfest file, do so...
 	if _commandlineoptions.retrievemanifestfrom:
@@ -522,6 +584,10 @@ def main():
 	# an ugly hack, but Python's request handlers don't have an easy way to pass arguments
 	_global_myxordatastore = myxordatastore
 	_global_manifestdict = manifestdict
+	_batchlock = threading.Lock()
+	_batchevent = threading.Event()
+	_batchrequests = 0
+	_xorstrings = ""
 
 	# first, let's fire up the RAID-PIR server
 	service_raidpir_clients(myxordatastore, _commandlineoptions.ip, _commandlineoptions.port)

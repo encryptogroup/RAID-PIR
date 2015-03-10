@@ -240,6 +240,7 @@ class RandomXORRequestor(Requestor):
 			params['cl'] = 1 # chunk length, here fixed to 1
 			params['lcl'] = 1 # last chunk length, here fixed to 1
 			params['b'] = batch
+			params['p'] = False
 
 			#send the params, rcvlet will check response
 			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "P" + msgpack.packb(params))
@@ -524,6 +525,7 @@ class RandomXORRequestorChunks(Requestor):
 			params['cl'] = self.chunklen
 			params['lcl'] = self.lastchunklen
 			params['b'] = batch
+			params['p'] = parallel
 
 			if rng:
 				params['s'] = thisrequestinfo['seed']
