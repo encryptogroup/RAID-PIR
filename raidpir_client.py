@@ -105,10 +105,6 @@ def _request_helper(rxgobj, tid):
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest(tid)
 
-	# for now, trigger batch processing manually after all requests have been sent
-	if _commandlineoptions.batch:
-		session.sendmessage(socket, 'B')
-
 	# and that's it!
 	return
 
@@ -144,10 +140,6 @@ def _request_helper_chunked(rxgobj, tid):
 
 		# regardless of failure or success, get another request...
 		thisrequest = rxgobj.get_next_xorrequest(tid)
-
-	# for now, trigger batch processing manually after all requests have been sent
-	if _commandlineoptions.batch:
-		session.sendmessage(socket, 'B')
 
 	# and that's it!
 	return
