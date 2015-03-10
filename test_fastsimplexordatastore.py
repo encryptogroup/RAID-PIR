@@ -21,6 +21,10 @@ xorresult = letterxordatastore.produce_xor_from_bitstring(bitstring)
 
 assert(xorresult[0] == 'R')
 
+xorresult = letterxordatastore.produce_xor_from_multiple_bitstrings(bitstring, 1)
+
+assert(xorresult[0] == 'R')
+
 # let's create a bitstring that uses A, C, and P.
 bitstring = chr(int('10100000', 2)) + chr(int('00000001',2)) + chr(int('10000000', 2)) + chr(int('00000000',2)) + chr(int('01001110', 2)) + chr(int('00000001',2))
 xorresult = letterxordatastore.produce_xor_from_multiple_bitstrings(bitstring, 3)
