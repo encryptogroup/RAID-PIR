@@ -23,11 +23,15 @@ static int xordatastoreinited = 0;
 static XORDatastore xordatastoretable[STARTING_XORDATASTORE_TABLESIZE];
 
 
+
+
 // Helper
-static inline void XOR_fullblocks(uint64_t *dest, uint64_t *data, long count) {
+static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, long count) {
 	register long i;
 	for (i=0; i<count; i++) {
-		*dest++ ^= *data++;
+		*dest = _mm_xor_si128(*data, *dest);
+		dest++;
+		data++;
 	}
 }
 
@@ -41,9 +45,9 @@ static inline void XOR_byteblocks(char *dest, const char *data, long count) {
 }
 
 
-// Moves ptr to the next DWORD aligned address.   If ptr is DWORD aligned, return ptr.
+// Moves ptr to the next aligned address. If ptr is aligned, return ptr.
 static inline char *dword_align(char *ptr) {
-	return ptr + (sizeof(uint64_t) - (((long)ptr) % sizeof(uint64_t))) % sizeof(uint64_t);
+	return ptr + (sizeof(__m128i) - (((long)ptr) % sizeof(__m128i))) % sizeof(__m128i);
 }
 
 
@@ -78,15 +82,15 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 			xordatastoretable[i].sizeofablock = block_size;
 
 			// I allocate a little bit extra so that I can DWORD align it
-			xordatastoretable[i].raw_datastore = calloc(1, num_blocks * block_size + sizeof(uint64_t));
+			xordatastoretable[i].raw_datastore = (char*) calloc(1, num_blocks * block_size + sizeof(__m128i));
 
 			// and align it...
-			xordatastoretable[i].datastore = (uint64_t *) dword_align(xordatastoretable[i].raw_datastore);
+			xordatastoretable[i].datastore = (__m128i *) dword_align(xordatastoretable[i].raw_datastore);
 			return i;
 		}
 	}
 
-	// The table is full! I really should expand it...
+	// The table is full! I should expand it...
 	printf("Internal Error: I need to expand the table size (unimplemented)\n");
 	return -1;
 }
@@ -97,26 +101,25 @@ static datastore_descriptor allocate(long block_size, long num_blocks)  {
 static PyObject *Allocate(PyObject *module, PyObject *args) {
 	long blocksize, numblocks;
 
-	if (!PyArg_ParseTuple(args, "ll", &blocksize,&numblocks)) {
+	if (!PyArg_ParseTuple(args, "ll", &blocksize, &numblocks)) {
 		// Incorrect args...
 		return NULL;
 	}
 
-	// This needs to be 64 byte aligned...
 	if (blocksize % 64) {
-		PyErr_SetString(PyExc_ValueError, "Block size must be a multiple of 64");
+		PyErr_SetString(PyExc_ValueError, "Block size must be a multiple of 64 byte");
 		return NULL;
 	}
 
-	return Py_BuildValue("i",allocate(blocksize, numblocks));
+	return Py_BuildValue("i", allocate(blocksize, numblocks));
 }
 
 
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
-static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, unsigned int numstrings, uint64_t *resultbuffer) {
-	long one_bit_string_length = bit_string_length / numstrings; // convert bytes to bits
-	long remaininglength = one_bit_string_length * 8;
+static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, unsigned int numstrings, __m128i *resultbuffer) {
+	long one_bit_string_length = bit_string_length / numstrings; // length of one bit string
+	long remaininglength = one_bit_string_length * 8; // convert bytes to bits
 	char *current_bit_string_pos;
 	current_bit_string_pos = bit_string;
 	long long offset = 0;
@@ -124,7 +127,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 	char *datastorebase;
 	datastorebase = (char *) xordatastoretable[ds].datastore;
 
-	int dwords_per_block = block_size / sizeof(uint64_t);
+	int dwords_per_block = block_size / sizeof(__m128i);
 
 	unsigned char bit = 128;
 	unsigned int i;
@@ -133,7 +136,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 		for(i = 0; i < numstrings; i++){
 			if ( *(current_bit_string_pos + one_bit_string_length * i) & bit) {
-				XOR_fullblocks(resultbuffer + dwords_per_block * i, (uint64_t *) (datastorebase + offset), dwords_per_block);
+				XOR_fullblocks(resultbuffer + dwords_per_block * i, (__m128i *) (datastorebase + offset), dwords_per_block);
 			}
 		}
 
@@ -151,7 +154,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
-static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, uint64_t *resultbuffer) {
+static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, __m128i *resultbuffer) {
 	long remaininglength = bit_string_length * 8;  // convert bytes to bits
 	char *current_bit_string_pos;
 	current_bit_string_pos = bit_string;
@@ -160,13 +163,13 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 	char *datastorebase;
 	datastorebase = (char *) xordatastoretable[ds].datastore;
 
-	int dwords_per_block = block_size / sizeof(uint64_t);
+	int dwords_per_block = block_size / sizeof(__m128i);
 
 	unsigned char bit = 128;
 
 	while (remaininglength > 0) {
 		if ((*current_bit_string_pos) & bit) {
-			XOR_fullblocks(resultbuffer, (uint64_t *) (datastorebase + offset), dwords_per_block);
+			XOR_fullblocks(resultbuffer, (__m128i *) (datastorebase + offset), dwords_per_block);
 		}
 		offset += block_size;
 		bit /= 2;
@@ -187,7 +190,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	int bitstringlength;
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
-	uint64_t *resultbuffer;
+	__m128i *resultbuffer;
 
 	if (!PyArg_ParseTuple(args, "is#", &ds, &bitstringbuffer, &bitstringlength)) {
 		// Incorrect args...
@@ -200,16 +203,14 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 		return NULL;
 	}
 
-	// Let's prepare a place to put this...
-	raw_resultbuffer = calloc(1, xordatastoretable[ds].sizeofablock + sizeof(uint64_t));
+	// Let's prepare a place to put the answer (1 block + alignment)
+	raw_resultbuffer = (char*) calloc(1, xordatastoretable[ds].sizeofablock + sizeof(__m128i));
 
-	// ... now let's get a DWORD aligned offset
-	resultbuffer = (uint64_t *) dword_align(raw_resultbuffer);
+	// align it
+	resultbuffer = (__m128i *) dword_align(raw_resultbuffer);
 
 	// Let's actually calculate this!
 	bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, resultbuffer);
-
-
 
 	// okay, let's put it in a buffer
 	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
@@ -230,7 +231,7 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	unsigned int numstrings;
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
-	uint64_t *resultbuffer;
+	__m128i *resultbuffer;
 
 
 	if (!PyArg_ParseTuple(args, "is#I", &ds, &bitstringbuffer, &bitstringlength, &numstrings)) {
@@ -239,18 +240,17 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	}
 
 
-
 	// Is the ds valid?
 	if (!is_table_entry_used(ds)) {
 		PyErr_SetString(PyExc_ValueError, "Bad index for Produce_Xor_From_Bitstring");
 		return NULL;
 	}
 
-	// Let's prepare a place to put this...
-	raw_resultbuffer = calloc(1, xordatastoretable[ds].sizeofablock * numstrings + sizeof(uint64_t));
+	// Let's prepare a place to put the answer (numstrings blocks + alignment)
+	raw_resultbuffer = (char*) calloc(1, xordatastoretable[ds].sizeofablock * numstrings + sizeof(__m128i));
 
-	// ... now let's get a DWORD aligned offset
-	resultbuffer = (uint64_t *) dword_align(raw_resultbuffer);
+	// align it
+	resultbuffer = (__m128i *) dword_align(raw_resultbuffer);
 
 	// Let's actually calculate this!
 	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer);
@@ -363,48 +363,46 @@ static PyObject *Deallocate(PyObject *module, PyObject *args) {
 
 
 // I just have this around for testing
-static char *slow_XOR(char *dest, const char *data, long stringlength) {
-	XOR_byteblocks(dest,data,stringlength);
+static char *slow_XOR(char *dest, const char *data, unsigned long stringlength) {
+	XOR_byteblocks(dest, data, stringlength);
 	return dest;
 }
 
 
 // This XORs data with the starting data in dest
-static char *fast_XOR(char *dest, const char *data, long stringlength) {
+static char *fast_XOR(char *dest, const char *data, unsigned long stringlength) {
 	int leadingmisalignedbytes;
 	long fulllengthblocks;
 	int remainingbytes;
 
 	// If it's shorter than a block, use char-based XOR
-	if (stringlength <= sizeof(uint64_t)) {
-		return slow_XOR(dest,data,stringlength);
+	if (stringlength <= sizeof(__m128i)) {
+		return slow_XOR(dest, data, stringlength);
 	}
 
+
 	// I would guess these should be similarly DWORD aligned...
-	if (((long) dest) % sizeof(uint64_t) == ((long) data) % sizeof(uint64_t)) {
+	if (((long) dest) % sizeof(__m128i) != ((long) data) % sizeof(__m128i)) {
 		printf("Error, assumed that dest and data are identically DWORD aligned!\n");
 		return NULL;
 	}
 
-
 	// Let's XOR any stray bytes at the front...
 
 	// This is the number of bytes that are before we get DWORD aligned
-	// To compute this we do (8 - (pos % 8)) % 8)
-	leadingmisalignedbytes = (sizeof(uint64_t) - (((long)data) % sizeof(uint64_t))) % sizeof(uint64_t);
+	// To compute this we do (16 - (pos % 16)) % 16)
+	leadingmisalignedbytes = (sizeof(__m128i) - (((long)data) % sizeof(__m128i))) % sizeof(__m128i);
 
 	XOR_byteblocks(dest, data, leadingmisalignedbytes);
 
-
 	// The middle will be done with full sized blocks...
-	fulllengthblocks = (stringlength-leadingmisalignedbytes) / sizeof(uint64_t);
+	fulllengthblocks = (stringlength-leadingmisalignedbytes) / sizeof(__m128i);
 
-	XOR_fullblocks((uint64_t *) (dest+leadingmisalignedbytes), (uint64_t *) (data + leadingmisalignedbytes), fulllengthblocks);
-
+	XOR_fullblocks((__m128i *) (dest+leadingmisalignedbytes), (__m128i *) (data + leadingmisalignedbytes), fulllengthblocks);
 
 
 	// XOR anything left over at the end...
-	remainingbytes = stringlength - (leadingmisalignedbytes + fulllengthblocks * sizeof(uint64_t));
+	remainingbytes = stringlength - (leadingmisalignedbytes + fulllengthblocks * sizeof(__m128i));
 	XOR_byteblocks(dest+stringlength-remainingbytes, data+stringlength-remainingbytes, remainingbytes);
 
 	return dest;
@@ -417,17 +415,16 @@ static char *fast_XOR(char *dest, const char *data, long stringlength) {
 static PyObject *do_xor(PyObject *module, PyObject *args) {
 	const char *str1, *str2;
 	long length;
-	long dl; //dummy length for strings.
 	char *destbuffer;
 	char *useddestbuffer;
 
 	// Parse the calling arguments
-	if (!PyArg_ParseTuple(args, "s#s#l", &str1, &dl, &str2, &dl, &length)) {
+	if (!PyArg_ParseTuple(args, "s#s#", &str1, &length, &str2, &length)) {
 		return NULL;
 	}
 
 	// Allocate enough memory to hold the result...
-	destbuffer = malloc(length + sizeof(uint64_t));
+	destbuffer = (char *) malloc(length + sizeof(__m128i));
 
 	if (destbuffer == NULL) {
 		PyErr_NoMemory();
@@ -435,8 +432,8 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 		return NULL;
 	}
 
-	// let's align this...
-	useddestbuffer = destbuffer + sizeof(uint64_t) - ((long) destbuffer %sizeof(uint64_t));
+	// let's align this to str2
+	useddestbuffer = destbuffer + ((long) str2 % sizeof(__m128i));
 
 	// ... copy str1 over
 	memcpy(useddestbuffer, str1, length);

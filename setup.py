@@ -17,7 +17,9 @@ if sys.version_info[0] != 2 or sys.version_info[1] != 7:
 
 
 fastsimpledatastore_c = Extension("fastsimplexordatastore_c",
-		sources=["fastsimplexordatastore.c"])
+		sources=["fastsimplexordatastore.c"]
+		#extra_compile_args=["-msse2", "-mstackrealign"] #might be required on some systems
+		)
 
 setup(	name="RAID-PIR",
 		version="0.9.0",

@@ -26,7 +26,7 @@ def do_xor(string_a, string_b):
 	if len(string_a) != len(string_b):
 		raise ValueError("do_xor requires strings of the same length")
 
-	return fastsimplexordatastore_c.do_xor(string_a, string_b, len(string_a))
+	return fastsimplexordatastore_c.do_xor(string_a, string_b)
 
 
 class XORDatastore(object):
@@ -71,8 +71,8 @@ class XORDatastore(object):
 		if block_size <= 0:
 			raise TypeError("Block size must be positive")
 
-		if block_size %64 != 0:
-			raise TypeError("Block size must be a multiple of 64")
+		if block_size % 64 != 0:
+			raise TypeError("Block size must be a multiple of 64 bytes")
 
 		if type(num_blocks) != int and type(num_blocks) != long:
 			raise TypeError("Number of blocks must be an integer")

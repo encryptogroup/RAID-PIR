@@ -101,8 +101,8 @@ for blockcount in [9,15,16]:
 # test fastsimplexordatastore.do_xor()
 from os import urandom
 
-aa=urandom(2**6+2)
-bb=urandom(2**6+2)
+aa=urandom(2**8 + 23)
+bb=urandom(2**8 + 23)
 
 cc = fastsimplexordatastore.do_xor(aa,bb)
 
@@ -110,6 +110,11 @@ cc = fastsimplexordatastore.do_xor(aa,bb)
 result = ""
 for pos in xrange(len(aa)):
 	result = result + chr(ord(aa[pos]) ^ ord(bb[pos]))
+
+# print aa.encode('hex')
+# print bb.encode('hex')
+# print cc.encode('hex')
+# print result.encode('hex')
 
 assert(result == cc)
 
