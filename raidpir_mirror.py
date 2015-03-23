@@ -189,7 +189,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				bitstring = requeststring[len('X'):]
 
-				expectedbitstringlength = raidpirlib.compute_bitstring_length(_global_myxordatastore.numberofblocks)
+				expectedbitstringlength = raidpirlib.bits_to_bytes(_global_myxordatastore.numberofblocks)
 
 				if len(bitstring) != expectedbitstringlength:
 					# Invalid request length...

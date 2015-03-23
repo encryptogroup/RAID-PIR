@@ -222,7 +222,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		global chunklen
 		global lastchunklen
 		chunklen = ( manifestdict['blockcount'] / 8 ) / _commandlineoptions.numberofmirrors
-		lastchunklen = raidpirlib.compute_bitstring_length(manifestdict['blockcount']) - (_commandlineoptions.numberofmirrors-1)*chunklen
+		lastchunklen = raidpirlib.bits_to_bytes(manifestdict['blockcount']) - (_commandlineoptions.numberofmirrors-1)*chunklen
 
 		if _commandlineoptions.timing:
 			req_start = _timer()

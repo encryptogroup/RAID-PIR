@@ -101,8 +101,8 @@ for blockcount in [9,15,16]:
 # test fastsimplexordatastore.do_xor()
 from os import urandom
 
-aa=urandom(2**10)
-bb=urandom(2**10)
+aa=urandom(2**6+2)
+bb=urandom(2**6+2)
 
 cc = fastsimplexordatastore.do_xor(aa,bb)
 

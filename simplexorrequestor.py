@@ -227,6 +227,7 @@ class RandomXORRequestor(Requestor):
 
 			# open a socket once:
 			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			thisrequestinfo['mirrorinfo']['socket'].setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #TODO check this in the cloud
 			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
 
 			self.activemirrorinfolist.append(thisrequestinfo)
@@ -250,7 +251,7 @@ class RandomXORRequestor(Requestor):
 			thisrequestinfo['rt'] = t
 			t.start()
 
-		bitstringlength = raidpirlib.compute_bitstring_length(manifestdict['blockcount'])
+		bitstringlength = raidpirlib.bits_to_bytes(manifestdict['blockcount'])
 
 		# let's generate the random bitstrings for k-1 mirrors
 		for thisrequestinfo in self.activemirrorinfolist[:-1]:
@@ -601,7 +602,7 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = raidpirlib.compute_bitstring_length(length)*'\0'
+					thisbitstring = raidpirlib.bits_to_bytes(length)*'\0'
 
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrorinfolist:
@@ -663,7 +664,7 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = raidpirlib.compute_bitstring_length(length)*'\0'
+					thisbitstring = raidpirlib.bits_to_bytes(length)*'\0'
 
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrorinfolist:

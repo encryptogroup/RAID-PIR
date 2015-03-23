@@ -766,9 +766,9 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
 	return fileinfo_list
 
 
-def compute_bitstring_length(num_blocks):
+def bits_to_bytes(num_bits):
 	"""compute bitstring length in bytes from number of blocks"""
-	return (num_blocks + 7) >> 3
+	return (num_bits + 7) >> 3
 
 
 def set_bitstring_bit(bitstring, bitnum, valuetoset):
@@ -939,17 +939,24 @@ def randombits(bitlength):
 		A random byte-string of supplied bitlength
 	"""
 	# offset for the last byte
-	bytelength = compute_bitstring_length(bitlength)
-	bitoffset = bitlength % 8
+	bytelength = bits_to_bytes(bitlength)
+	bitoffset = bitlength % 16
 
 	if bitoffset > 0:
-		# if the blockcount is not a multiple of 8, clear the rightmost bits
-		randombytes = os.urandom(bytelength - 1)
+		# if the blockcount is not a multiple of 16, clear the rightmost bits
+		randombytes = os.urandom(bytelength - 2)
+
 		b = ord(os.urandom(1))
 		for i in range(8 - bitoffset):
 			b &= ~(1 << i)
 		b = chr(b)
-		randombytes += b
+
+		if bitoffset<8:
+			randombytes += b
+			randombytes += "\0"
+		else:
+			randombytes += os.urandom(1)
+			randombytes += b
 		return randombytes
 	else:
 		return os.urandom(bytelength)
@@ -975,7 +982,7 @@ def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):
 
 	result = ""
 	chunklen = chunklen / 8
-	lastchunklen = compute_bitstring_length(lastchunklen)
+	lastchunklen = bits_to_bytes(lastchunklen)
 
 	for i in range(0, k):
 		if i in chunks:
@@ -1009,7 +1016,7 @@ def build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen):
 
 	result = {}
 	chunklen = chunklen / 8
-	lastchunklen = compute_bitstring_length(lastchunklen)
+	lastchunklen = bits_to_bytes(lastchunklen)
 
 
 	for c in chunks:
@@ -1062,7 +1069,7 @@ def nextrandombitsAES(cipher, bitlength):
 	"""
 
 	# offset for the last byte
-	bytelength = compute_bitstring_length(bitlength)
+	bytelength = bits_to_bytes(bitlength)
 	bitoffset = bitlength % 8
 
 	if bitoffset > 0:
