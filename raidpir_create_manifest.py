@@ -107,6 +107,7 @@ def parse_options():
 				type="string", metavar="algorithm", default="nogaps",
 				help="Chooses how to put the files into blocks (default is nogaps). Currently only nogaps is supported.")
 
+	parser.add_option("-d", "--database", dest="database", metavar="filename", type="string", default=None, help="Create a single database file with this name and copy files into it.")
 
 
 	# let's parse the args
@@ -148,8 +149,6 @@ def parse_options():
 	return commandlineoptions
 
 
-
-
 if __name__ == '__main__':
 
 	print "RAID-PIR create manifest", raidpirlib.pirversion
@@ -173,4 +172,7 @@ if __name__ == '__main__':
 
 	manifestfo.close()
 
-	print "Generated", commandlineoptions.manifestfile, "describing xordatastore with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.'
+	if commandlineoptions.database != None:
+		raidpirlib._write_db(commandlineoptions.rootdir, commandlineoptions.database)
+
+	print "Generated manifest", commandlineoptions.manifestfile, "with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.'

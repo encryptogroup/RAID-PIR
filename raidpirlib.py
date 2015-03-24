@@ -765,6 +765,35 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
 	print "Fileinfolist generation done."
 	return fileinfo_list
 
+def _write_db(startdirectory, dbname):
+	"""private helper. Writes all files into a single db file"""
+
+	oo = open(dbname, 'w')
+
+	# Header
+	oo.write("RAIDPIR_DB")
+
+	# let's walk through the directories and add the files + sizes
+	for parentdir, junkchilddirectories, filelist in os.walk(startdirectory):
+		for filename in filelist:
+			thisfiledict = {}
+			# we want the relative name in the manifest, not the actual path / name
+			fullfilename = os.path.join(parentdir, filename)
+
+			# open and read file
+			fd = open(fullfilename)
+			filecontents = fd.read()
+
+			#append it to single db file
+			oo.write(filecontents);
+
+			fd.close()
+			del filecontents
+			del fd
+
+	print "Database", dbname, "created."
+	oo.close();
+
 
 def bits_to_bytes(num_bits):
 	"""compute bitstring length in bytes from number of blocks"""
