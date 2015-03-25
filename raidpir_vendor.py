@@ -39,7 +39,7 @@ import sys
 import optparse
 
 # helper functions that are shared
-import raidpirlib
+import raidpirlib as lib
 
 # Check the python version
 if sys.version_info[0] != 2 or sys.version_info[1] != 7:
@@ -342,7 +342,7 @@ def main():
 	_global_rawmirrorlist = msgpack.packb([])
 
 	# I do this just for the sanity / corruption check
-	manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
+	manifestdict = lib.parse_manifest(rawmanifestdata)
 
 
 	# vendor ip
@@ -375,7 +375,7 @@ def main():
 if __name__ == '__main__':
 	parse_options()
 	try:
-		print "RAID-PIR Vendor", raidpirlib.pirversion
+		print "RAID-PIR Vendor", lib.pirversion
 		main()
 	except Exception, e:
 		# log errors to prevent silent exiting...

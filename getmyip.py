@@ -11,13 +11,10 @@
 import socket
 
 
-
-STABLE_PUBLIC_IPS = ["18.7.22.69",      # M.I.T
-										"171.67.216.8",     # Stanford
-										"169.229.131.81",   # Berkley
-										"140.142.12.202"]   # Univ. of Washington
-
-
+STABLE_PUBLIC_IPS = ["18.7.22.69", # M.I.T
+					"171.67.216.8", # Stanford
+					"169.229.131.81", # Berkley
+					"140.142.12.202"] # Univ. of Washington
 
 
 def get_localIP_to_remoteIP(connection_type, external_ip, external_port=80):
@@ -55,9 +52,6 @@ def get_localIP_to_remoteIP(connection_type, external_ip, external_port=80):
 		sockobj.close()
 
 	return myip
-
-
-
 
 
 # Public interface

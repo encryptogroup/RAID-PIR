@@ -189,7 +189,6 @@ class XORDatastore(object):
 			self._blocks.append(chr(0) * self.sizeofblocks)
 
 
-
 	def produce_xor_from_bitstring(self, bitstring):
 		"""
 		<Purpose>
@@ -241,8 +240,6 @@ class XORDatastore(object):
 
 		# let's return the result!
 		return currentblock
-
-
 
 
 	def set_data(self, offset, data_to_add):
@@ -301,9 +298,6 @@ class XORDatastore(object):
 		# finally, add the end block.   Add everything left over and pad with the previous block data.
 		if endoffset > 0:
 			self._blocks[endblock] = data_to_add[amountadded:] + self._blocks[endblock][len(data_to_add) - amountadded:]
-
-
-
 
 
 	def get_data(self, offset, quantity):
@@ -368,14 +362,12 @@ class XORDatastore(object):
 		return currentstring
 
 
-
 	def _find_blockloc_from_offset(self, offset):
 		# Private helper function that translates an offset into (block, offset)
 		assert offset >= 0
 		assert offset <= self.numberofblocks * self.sizeofblocks
 
 		return (offset / self.sizeofblocks, offset % self.sizeofblocks)
-
 
 
 	def __del__(self):  # deallocate

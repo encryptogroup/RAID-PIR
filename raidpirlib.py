@@ -75,7 +75,6 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 			currenthashlist.append('')
 		return currenthashlist
 
-
 	# Now I'll check the blocks have the right hash...
 	for blocknum in xrange(blockcount):
 		# read the block ...
@@ -160,6 +159,7 @@ _supported_hashalgorithms = ['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha51
 
 _supported_hashencodings = ['hex', 'raw']
 
+
 def find_hash(contents, algorithm):
 	"""Helper function for hashing"""
 
@@ -204,7 +204,6 @@ def transmit_mirrorinfo(mirrorinfo, vendorlocation, defaultvendorport=62293):
 
 		defaultvendorport: the port to use if the vendorlocation does not include one.
 
-
 	<Exceptions>
 		TypeError if the args are the wrong types or malformed...
 
@@ -240,7 +239,6 @@ def retrieve_rawmanifest(vendorlocation, defaultvendorport=62293):
 
 		defaultvendorport: the port to use if the vendorlocation does not include one.
 
-
 	<Exceptions>
 		TypeError if the vendorlocation is the wrong type or malformed.
 
@@ -255,7 +253,7 @@ def retrieve_rawmanifest(vendorlocation, defaultvendorport=62293):
 	"""
 	return _remote_query_helper(vendorlocation, "GET MANIFEST", defaultvendorport)
 
-def retrieve_xorblock_from_mirror(socket, bitstring):
+def retrieve_xorblock(socket, bitstring):
 
 	"""
 	<Purpose>
@@ -286,11 +284,11 @@ def retrieve_xorblock_from_mirror(socket, bitstring):
 	return response
 
 # only request a xorblock, without receiving it
-def request_xorblock_from_mirror(socket, bitstring):
+def request_xorblock(socket, bitstring):
 	session.sendmessage(socket, "X" + bitstring)
 
 
-def retrieve_xorblock_from_mirror_chunked(socket, chunks):
+def retrieve_xorblock_chunked(socket, chunks):
 	response = _remote_query_helper_sock(socket, "C" + msgpack.packb(chunks))
 
 	if response == 'Invalid request length':
@@ -300,11 +298,11 @@ def retrieve_xorblock_from_mirror_chunked(socket, chunks):
 	return response
 
 # only request a xorblock, without receiving it
-def request_xorblock_from_mirror_chunked(socket, chunks):
+def request_xorblock_chunked(socket, chunks):
 	session.sendmessage(socket, "C" + msgpack.packb(chunks))
 
 
-def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
+def retrieve_xorblock_chunked_rng(socket, chunks):
 	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
@@ -313,11 +311,11 @@ def retrieve_xorblock_from_mirror_chunked_rng(socket, chunks):
 	return response
 
 # only request a xorblock, without receiving it
-def request_xorblock_from_mirror_chunked_rng(socket, chunks):
+def request_xorblock_chunked_rng(socket, chunks):
 	session.sendmessage(socket, "R" + msgpack.packb(chunks))
 
 
-def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
+def retrieve_xorblock_chunked_rng_parallel(socket, chunks):
 	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
 	if response == 'Invalid request length':
 		raise ValueError(response)
@@ -327,7 +325,7 @@ def retrieve_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
 
 
 # only request a xorblock, without receiving it
-def request_xorblock_from_mirror_chunked_rng_parallel(socket, chunks):
+def request_xorblock_chunked_rng_parallel(socket, chunks):
 	session.sendmessage(socket, "M" + msgpack.packb(chunks))
 
 
@@ -338,7 +336,7 @@ def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
 
 	<Arguments>
 		vendorlocation: A string that contains the vendor location.   This can be
-										of the form "IP:port", "hostname:port", "IP", or "hostname"
+						of the form "IP:port", "hostname:port", "IP", or "hostname"
 
 		defaultvendorport: the port to use if the vendorlocation does not include
 											 one.
@@ -735,7 +733,7 @@ def get_filenames_in_release(manifestdict):
 	return filenamelist
 
 
-def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
+def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-raw"):
 	"""private helper.   Generates a list of file information dictionaries for all files under startdirectory."""
 
 	fileinfo_list = []
@@ -764,6 +762,7 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-hex"):
 
 	print "Fileinfolist generation done."
 	return fileinfo_list
+
 
 def _write_db(startdirectory, dbname):
 	"""private helper. Writes all files into a single db file"""
@@ -897,10 +896,8 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 	manifestdict['vendorhostname'] = vendorhostname
 	manifestdict['vendorport'] = vendorport
 
-
 	# first get the file information
 	fileinfolist = _generate_fileinfolist(rootdir, manifestdict['hashalgorithm'])
-
 
 	# now let's assign the files to offsets as the caller requests...
 	offset_assignment_function(fileinfolist, rootdir, manifestdict['blocksize'])
@@ -915,7 +912,6 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 	# ...sort the tuples so that it's easy to walk down them and check for
 	# overlapping entries...
 	offsetlengthtuplelist.sort()
-
 
 	# ...now, we need to ensure the values don't overlap.
 	nextfreeoffset = 0

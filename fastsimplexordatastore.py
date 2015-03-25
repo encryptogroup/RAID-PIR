@@ -144,7 +144,6 @@ class XORDatastore(object):
 		return fastsimplexordatastore_c.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
 
 
-
 	def set_data(self, offset, data_to_add):
 		"""
 		<Purpose>
@@ -177,7 +176,6 @@ class XORDatastore(object):
 			raise TypeError("Offset + added data overflows the XORdatastore")
 
 		return fastsimplexordatastore_c.SetData(self.ds, offset, data_to_add)
-
 
 
 	def get_data(self, offset, quantity):

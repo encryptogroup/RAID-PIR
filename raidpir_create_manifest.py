@@ -50,7 +50,7 @@ See below
 
 import sys
 
-import raidpirlib
+import raidpirlib as lib
 
 import optparse
 
@@ -62,7 +62,7 @@ if sys.version_info[0] != 2 or sys.version_info[1] != 7:
 import msgpack
 
 # This says which function corresponds to an option
-_offsetoptionname_to_functionmap = {'nogaps':raidpirlib.nogaps_offset_assignment_function}
+_offsetoptionname_to_functionmap = {'nogaps':lib.nogaps_offset_assignment_function}
 
 
 
@@ -151,17 +151,17 @@ def parse_options():
 
 if __name__ == '__main__':
 
-	print "RAID-PIR create manifest", raidpirlib.pirversion
+	print "RAID-PIR create manifest", lib.pirversion
 	# parse user provided data
 	commandlineoptions = parse_options()
 
 	# create the dict
-	manifestdict = raidpirlib.create_manifest(rootdir=commandlineoptions.rootdir,
-				hashalgorithm=commandlineoptions.hashalgorithm,
-				block_size=commandlineoptions.blocksize,
-				offset_assignment_function=commandlineoptions.offsetalgorithm,
-				vendorhostname=commandlineoptions.vendorhostname,
-				vendorport=commandlineoptions.vendorport)
+	manifestdict = lib.create_manifest(rootdir=commandlineoptions.rootdir,
+		hashalgorithm=commandlineoptions.hashalgorithm,
+		block_size=commandlineoptions.blocksize,
+		offset_assignment_function=commandlineoptions.offsetalgorithm,
+		vendorhostname=commandlineoptions.vendorhostname,
+		vendorport=commandlineoptions.vendorport)
 
 	# open the destination file
 	manifestfo = open(commandlineoptions.manifestfile, 'w')
@@ -173,6 +173,6 @@ if __name__ == '__main__':
 	manifestfo.close()
 
 	if commandlineoptions.database != None:
-		raidpirlib._write_db(commandlineoptions.rootdir, commandlineoptions.database)
+		lib._write_db(commandlineoptions.rootdir, commandlineoptions.database)
 
 	print "Generated manifest", commandlineoptions.manifestfile, "with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.'

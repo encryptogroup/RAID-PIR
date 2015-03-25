@@ -46,7 +46,7 @@ import optparse
 import fastsimplexordatastore
 
 # helper functions that are shared
-import raidpirlib
+import raidpirlib as lib
 
 # This is used to communicate with clients with a message like abstraction
 import session
@@ -97,9 +97,9 @@ def _send_mirrorinfo():
 	mymirrorinfo = {'ip':_commandlineoptions.ip, 'port':_commandlineoptions.port}
 
 	if _commandlineoptions.vendorip == None:
-		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _global_manifestdict['vendorhostname'], _global_manifestdict['vendorport'])
+		lib.transmit_mirrorinfo(mymirrorinfo, _global_manifestdict['vendorhostname'], _global_manifestdict['vendorport'])
 	else:
-		raidpirlib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport'])
+		lib.transmit_mirrorinfo(mymirrorinfo, _commandlineoptions.vendorip, _global_manifestdict['vendorport'])
 
 
 #################### Batch Answer Thread ######################
@@ -189,7 +189,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				bitstring = requeststring[len('X'):]
 
-				expectedbitstringlength = raidpirlib.bits_to_bytes(_global_myxordatastore.numberofblocks)
+				expectedbitstringlength = lib.bits_to_bytes(_global_myxordatastore.numberofblocks)
 
 				if len(bitstring) != expectedbitstringlength:
 					# Invalid request length...
@@ -225,7 +225,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				chunks = msgpack.unpackb(payload)
 
-				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen)
+				bitstring = lib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen)
 
 				if not batch:
 					# Now let's process this...
@@ -260,10 +260,10 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					else:
 						length = chunklen
 
-					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
+					chunks[c] = lib.nextrandombitsAES(cipher, length)
 
 
-				bitstring = raidpirlib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
+				bitstring = lib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen) #the expanded query
 
 				if not batch:
 					# Now let's process this...
@@ -299,10 +299,10 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					else:
 						length = chunklen
 
-					chunks[c] = raidpirlib.nextrandombitsAES(cipher, length)
+					chunks[c] = lib.nextrandombitsAES(cipher, length)
 
 
-				bitstrings = raidpirlib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
+				bitstrings = lib.build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen) #the expanded query
 
 				if not batch:
 
@@ -341,7 +341,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				parallel = params['p']
 
 				if 's' in params:
-					cipher = raidpirlib.initAES(params['s'])
+					cipher = lib.initAES(params['s'])
 
 				if batch:
 					# create batch xor thread
@@ -553,10 +553,10 @@ def main():
 	# If we were asked to retrieve the mainfest file, do so...
 	if _commandlineoptions.retrievemanifestfrom:
 		# We need to download this file...
-		rawmanifestdata = raidpirlib.retrieve_rawmanifest(_commandlineoptions.retrievemanifestfrom)
+		rawmanifestdata = lib.retrieve_rawmanifest(_commandlineoptions.retrievemanifestfrom)
 
 		# ...make sure it is valid...
-		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
+		manifestdict = lib.parse_manifest(rawmanifestdata)
 
 		# ...and write it out if it's okay
 		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
@@ -565,7 +565,7 @@ def main():
 	else:
 		# Simply read it in from disk
 		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
-		manifestdict = raidpirlib.parse_manifest(rawmanifestdata)
+		manifestdict = lib.parse_manifest(rawmanifestdata)
 
 	# We should detach here.   I don't do it earlier so that error
 	# messages are written to the terminal...   I don't do it later so that any
@@ -576,7 +576,7 @@ def main():
 	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'])
 
 	# now let's put the content in the datastore in preparation to serve it
-	raidpirlib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.files)
+	lib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.files)
 
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')
@@ -611,7 +611,7 @@ def main():
 
 
 if __name__ == '__main__':
-	print "RAID-PIR mirror", raidpirlib.pirversion
+	print "RAID-PIR mirror", lib.pirversion
 	parse_options()
 	try:
 		main()

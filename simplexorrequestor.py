@@ -13,7 +13,7 @@
 import fastsimplexordatastore as xordatastore
 
 # helper functions that are shared
-import raidpirlib
+import raidpirlib as lib
 
 # used for locking parallel requests
 import threading
@@ -25,7 +25,7 @@ import socket
 import session
 
 # to sleep...
-_timer = raidpirlib._timer
+_timer = lib._timer
 
 try:
 	#for packing more complicated messages
@@ -41,11 +41,11 @@ _randomnumberfunction = os.urandom
 import random
 
 
-########################### XORRequestGenerator ###############################
+########################### XORRequestGenerator ################################
 
 # receive thread
-def rcvlet(requestinfo, rxgobj):
-	sock = requestinfo['mirrorinfo']['socket']
+def rcvlet(mirror, rxgobj):
+	sock = mirror['info']['sock']
 
 	# first, check if params were received correctly
 	if session.recvmessage(sock) != 'PARAMS OK':
@@ -53,22 +53,22 @@ def rcvlet(requestinfo, rxgobj):
 
 	data = "0"
 	first = True
-	while data != '' and len(requestinfo['blocksrequested']) > 0 or first:
+	while data != '' and len(mirror['blocksrequested']) > 0 or first:
 		first = False
 		data = session.recvmessage(sock)
-		rxgobj.notify_success(requestinfo['mirrorinfo'], data)
+		rxgobj.notify_success(mirror['info'], data)
 
 
 def _reconstruct_block(blockinfolist):
 	# private helper to reconstruct a block
 
 	# xor the blocks together
-	currentresult = blockinfolist[0]
+	ret = blockinfolist[0]
 	for xorblock in blockinfolist[1:]:
-		currentresult = xordatastore.do_xor(currentresult, xorblock)
+		ret = xordatastore.do_xor(ret, xorblock)
 
 	# and return the answer
-	return currentresult
+	return ret
 
 
 def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
@@ -97,28 +97,27 @@ class InsufficientMirrors(Exception):
 # Super class of requestors that offers identical functions
 class Requestor(object):
 
-
 	def cleanup(self):
 		"""cleanup. here: maybe request debug timing info and always close sockets"""
-		for thisrequestinfo in self.activemirrorinfolist:
+		for mirror in self.activemirrors:
 
 			if self.timing:
 				# request total computation time and measure delay
 				ping_start = _timer()
-				session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "T")
-				thisrequestinfo['mirrorinfo']['comptime'] = float(session.recvmessage(thisrequestinfo['mirrorinfo']['socket'])[1:])
-				thisrequestinfo['mirrorinfo']['ping'] = _timer() - ping_start
+				session.sendmessage(mirror['info']['sock'], "T")
+				mirror['info']['comptime'] = float(session.recvmessage(mirror['info']['sock'])[1:])
+				mirror['info']['ping'] = _timer() - ping_start
 
-			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "Q")
-			thisrequestinfo['mirrorinfo']['socket'].close()
+			session.sendmessage(mirror['info']['sock'], "Q")
+			mirror['info']['sock'].close()
 
 
 	def return_timings(self):
 		comptimes = []
 		pings = []
-		for rqi in self.activemirrorinfolist:
-			comptimes.append(rqi['mirrorinfo']['comptime'])
-			pings.append(rqi['mirrorinfo']['ping'])
+		for mirror in self.activemirrors:
+			comptimes.append(mirror['info']['comptime'])
+			pings.append(mirror['info']['ping'])
 
 		return self.recons_time, comptimes, pings
 
@@ -146,37 +145,10 @@ class RandomXORRequestor(Requestor):
 
 	<Side Effects>
 		None.
-
-	<Example Use>
-		>>> rxgobj = RandomXORRequestor(['mirror1','mirror2','mirror3'],
-						 [23, 45], { ...# manifest dict omitted # }, 2)
-
-		>>> print rxgobj.get_next_xorrequest()
-		('mirror3',23, '...')   # bitstring omitted
-		>>> print rxgobj.get_next_xorrequest()
-		('mirror1',23, '...')   # bitstring omitted
-		>>> print rxgobj.get_next_xorrequest()
-		# this will block because we didn't say either of the others
-		# completed and there are no other mirrors waiting
-
-		>>> rxgobj.notify_success(('mirror1',23,'...'), '...')
-		# the bit string and result were omitted from the previous statement
-		>>> print rxgobj.get_next_xorrequest()
-		('mirror1',45, '...')   # bitstring omitted
-		>>> rxgobj.notify_success(('mirror3',23, '...'), '...')
-		>>> print rxgobj.get_next_xorrequest()
-		('mirror1',45, '...')   # bitstring omitted
-		>>> rxgobj.notify_failure(('mirror1',45, '...'))
-		>>> print rxgobj.get_next_xorrequest()
-		('mirror2',45, '...')
-		>>> rxgobj.notify_success(('mirror2',45, '...'), '...')
-		>>> print rxgobj.get_next_xorrequest()
-		()
-
 	"""
 
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, batch, timing, pollinginterval=.1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, batch, timing):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
@@ -192,8 +164,6 @@ class RandomXORRequestor(Requestor):
 
 			timing: collect timing info
 
-			pollinginterval: the amount of time to sleep between checking for the ability to serve a mirror.
-
 		<Exceptions>
 			TypeError may be raised if invalid parameters are given.
 
@@ -203,7 +173,6 @@ class RandomXORRequestor(Requestor):
 		self.blocklist = blocklist
 		self.manifestdict = manifestdict
 		self.privacythreshold = privacythreshold
-		self.pollinginterval = pollinginterval
 		self.timing = timing
 		if timing:
 			self.recons_time = 0
@@ -216,23 +185,22 @@ class RandomXORRequestor(Requestor):
 		random.shuffle(self.fullmirrorinfolist)
 
 		# let's make a list of mirror information (what has been retrieved, etc.)
-		self.activemirrorinfolist = []
+		self.activemirrors = []
 		for mirrorinfo in self.fullmirrorinfolist[:self.privacythreshold]:
-			thisrequestinfo = {}
-			thisrequestinfo['mirrorinfo'] = mirrorinfo
-			thisrequestinfo['servingrequest'] = False
-			thisrequestinfo['blocksneeded'] = blocklist[:]
-			thisrequestinfo['blockbitstringlist'] = []
-			thisrequestinfo['blocksrequested'] = []
+			mirrors = {}
+			mirrors['info'] = mirrorinfo
+			mirrors['blocksneeded'] = blocklist[:]
+			mirrors['blockbitstringlist'] = []
+			mirrors['blocksrequested'] = []
 
 			# open a socket once:
-			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			thisrequestinfo['mirrorinfo']['socket'].setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #TODO check this in the cloud
-			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
+			mirrors['info']['sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			mirrors['info']['sock'].setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) #TODO check this in the cloud
+			mirrors['info']['sock'].connect((mirrorinfo['ip'], mirrorinfo['port']))
 
-			self.activemirrorinfolist.append(thisrequestinfo)
+			self.activemirrors.append(mirrors)
 
-		for thisrequestinfo in self.activemirrorinfolist:
+		for thisrequestinfo in self.activemirrors:
 			#send parameters to mirrors once
 			params = {}
 			params['cn'] = 1 # chunk numbers, here fixed to 1
@@ -244,34 +212,34 @@ class RandomXORRequestor(Requestor):
 			params['p'] = False
 
 			#send the params, rcvlet will check response
-			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "P" + msgpack.packb(params))
+			session.sendmessage(thisrequestinfo['info']['sock'], "P" + msgpack.packb(params))
 
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
+			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['info']['ip'], thisrequestinfo['info']['port']))))
 			thisrequestinfo['rt'] = t
 			t.start()
 
-		bitstringlength = raidpirlib.bits_to_bytes(manifestdict['blockcount'])
+		bitstringlength = lib.bits_to_bytes(manifestdict['blockcount'])
 
 		# let's generate the random bitstrings for k-1 mirrors
-		for thisrequestinfo in self.activemirrorinfolist[:-1]:
+		for thisrequestinfo in self.activemirrors[:-1]:
 
 			for _ in blocklist:
-				thisrequestinfo['blockbitstringlist'].append(raidpirlib.randombits(manifestdict['blockcount']))
+				thisrequestinfo['blockbitstringlist'].append(lib.randombits(manifestdict['blockcount']))
 
 		# now, let's do the 'derived' ones...
 		for blocknum in xrange(len(blocklist)):
 			thisbitstring = '\0'*bitstringlength
 
 			# xor the random strings together
-			for requestinfo in self.activemirrorinfolist[:-1]:
+			for requestinfo in self.activemirrors[:-1]:
 				thisbitstring = xordatastore.do_xor(thisbitstring, requestinfo['blockbitstringlist'][blocknum])
 
 			# flip the appropriate bit for the block we want
-			thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocklist[blocknum])
+			thisbitstring = lib.flip_bitstring_bit(thisbitstring, blocklist[blocknum])
 
 			# store the result for the last mirror
-			self.activemirrorinfolist[-1]['blockbitstringlist'].append(thisbitstring)
+			self.activemirrors[-1]['blockbitstringlist'].append(thisbitstring)
 
 		# want to have a structure for locking
 		self.tablelock = threading.Lock()
@@ -312,18 +280,17 @@ class RandomXORRequestor(Requestor):
 		#   1) nothing that still needs to be requested -> return ()
 		#   2) there is a request ready -> return the request
 
-		requestinfo = self.activemirrorinfolist[tid]
+		mirror = self.activemirrors[tid]
 
 		# this mirror is done...
-		if len(requestinfo['blocksneeded']) == 0:
+		if len(mirror['blocksneeded']) == 0:
 			return ()
 
 		# otherwise set it to be taken...
-		requestinfo['servingrequest'] = True
-		blocknum = requestinfo['blocksneeded'].pop()
-		requestinfo['blocksrequested'].append(blocknum)
+		blocknum = mirror['blocksneeded'].pop()
+		mirror['blocksrequested'].append(blocknum)
 
-		return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockbitstringlist'].pop())
+		return (mirror['info'], blocknum, mirror['blockbitstringlist'].pop())
 
 
 	def notify_failure(self, xorrequesttuple):
@@ -357,12 +324,11 @@ class RandomXORRequestor(Requestor):
 			failedmirrorsinfo = xorrequesttuple[0]
 
 			# now, let's find the activemirror this corresponds to.
-			for activemirrorinfo in self.activemirrorinfolist:
-				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
+			for mirror in self.activemirrors:
+				if mirror['info'] == failedmirrorsinfo:
 
 					# let's mark it as inactive and set up a different mirror
-					activemirrorinfo['mirrorinfo'] = nextmirrorinfo
-					activemirrorinfo['servingrequest'] = False
+					mirror['info'] = nextmirrorinfo
 					return
 
 			raise Exception("InternalError: Unknown mirror in notify_failure")
@@ -400,11 +366,11 @@ class RandomXORRequestor(Requestor):
 		try:
 
 			# now, let's find the activemirror this corresponds to.
-			for activemirrorinfo in self.activemirrorinfolist:
-				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
+			for mirror in self.activemirrors:
+				if mirror['info'] == thismirrorsinfo:
 
 					# remove the block and bitstring (asserting they match what we said before)
-					blocknumber = activemirrorinfo['blocksrequested'].pop(0)
+					blocknumber = mirror['blocksrequested'].pop(0)
 
 					# add the xorblockinfo to the dict
 					self.returnedxorblocksdict[blocknumber].append(xorblock)
@@ -417,7 +383,7 @@ class RandomXORRequestor(Requestor):
 					resultingblock = _reconstruct_block(self.returnedxorblocksdict[blocknumber])
 
 					# let's check the hash...
-					resultingblockhash = raidpirlib.find_hash(resultingblock, self.manifestdict['hashalgorithm'])
+					resultingblockhash = lib.find_hash(resultingblock, self.manifestdict['hashalgorithm'])
 					if resultingblockhash != self.manifestdict['blockhashlist'][blocknumber]:
 						# TODO: We should notify the vendor!
 						raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt')
@@ -443,11 +409,12 @@ class RandomXORRequestor(Requestor):
 
 class RandomXORRequestorChunks(Requestor):
 
-	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, batch, timing, pollinginterval=.1):
+	def __init__(self, mirrorinfolist, blocklist, manifestdict, privacythreshold, redundancy, rng, parallel, batch, timing):
 		"""
 		<Purpose>
 			Get ready to handle requests for XOR block strings, etc.
-			This is meant to be used for queries partitioned in chunks (parallel or SB queries with redundancy parameter)
+			This is meant to be used for queries partitioned in chunks
+				(parallel or SB queries with redundancy parameter)
 
 		<Exceptions>
 			TypeError may be raised if invalid parameters are given.
@@ -459,8 +426,7 @@ class RandomXORRequestorChunks(Requestor):
 		self.blocklist = blocklist
 		self.manifestdict = manifestdict
 		self.privacythreshold = privacythreshold # aka k, the number of mirrors to use
-		self.pollinginterval = pollinginterval
-		self.redundancy = redundancy #aka r
+		self.redundancy = redundancy # aka r
 		self.rng = rng
 		self.parallel = parallel
 		self.blockcount = manifestdict['blockcount']
@@ -474,7 +440,7 @@ class RandomXORRequestorChunks(Requestor):
 		self.lastchunklen = self.blockcount - (privacythreshold-1)*self.chunklen
 
 		if len(mirrorinfolist) < self.privacythreshold:
-			raise InsufficientMirrors("Requested the use of "+str(self.privacythreshold)+" mirrors, but only "+str(len(mirrorinfolist))+" were available.")
+			raise InsufficientMirrors("Requested the use of " + str(self.privacythreshold) + " mirrors, but only " + str(len(mirrorinfolist)) + " were available.")
 
 		# now we do the 'random' part. I copy the mirrorinfolist to avoid changing the list in place.
 		self.fullmirrorinfolist = mirrorinfolist[:]
@@ -482,45 +448,44 @@ class RandomXORRequestorChunks(Requestor):
 
 
 		# let's make a list of mirror information (what has been retrieved, etc.)
-		self.activemirrorinfolist = []
+		self.activemirrors = []
 
 		#initialize queries for mirrors
 		i = 0
 		for mirrorinfo in self.fullmirrorinfolist[:self.privacythreshold]:
-			thisrequestinfo = {}
-			thisrequestinfo['mirrorinfo'] = mirrorinfo
-			thisrequestinfo['servingrequest'] = False
-			thisrequestinfo['blocksneeded'] = blocklist[:] # only for the client, obviously
-			thisrequestinfo['blocksrequested'] = []
+			mirror = {}
+			mirror['info'] = mirrorinfo
+			mirror['blocksneeded'] = blocklist[:] # only for the client, obviously
+			mirror['blocksrequested'] = []
 
 			if parallel:
-				thisrequestinfo['parallelblocksneeded'] = []
+				mirror['parallelblocksneeded'] = []
 
-			thisrequestinfo['blockchunklist'] = []
+			mirror['blockchunklist'] = []
 
 
 			# chunk numbers [0, ..., r-1]
-			thisrequestinfo['chunknumbers'] = [i]
+			mirror['chunknumbers'] = [i]
 			for j in xrange(1, redundancy):
-				thisrequestinfo['chunknumbers'].append((i+j) % privacythreshold)
+				mirror['chunknumbers'].append((i+j) % privacythreshold)
 			i = i + 1
 
 			#open a socket once:
-			thisrequestinfo['mirrorinfo']['socket'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			thisrequestinfo['mirrorinfo']['socket'].connect((mirrorinfo['ip'], mirrorinfo['port']))
+			mirror['info']['sock'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			mirror['info']['sock'].connect((mirrorinfo['ip'], mirrorinfo['port']))
 
 			if rng:
 				#pick a random seed (key) and initialize AES
 				seed = _randomnumberfunction(16) # random 128 bit key
-				thisrequestinfo['seed'] = seed
-				thisrequestinfo['cipher'] = raidpirlib.initAES(seed)
+				mirror['seed'] = seed
+				mirror['cipher'] = lib.initAES(seed)
 
-			self.activemirrorinfolist.append(thisrequestinfo)
+			self.activemirrors.append(mirror)
 
-		for thisrequestinfo in self.activemirrorinfolist:
+		for mirror in self.activemirrors:
 			#send parameters to mirrors once
 			params = {}
-			params['cn'] = thisrequestinfo['chunknumbers']
+			params['cn'] = mirror['chunknumbers']
 			params['k'] = privacythreshold
 			params['r'] = redundancy
 			params['cl'] = self.chunklen
@@ -529,14 +494,14 @@ class RandomXORRequestorChunks(Requestor):
 			params['p'] = parallel
 
 			if rng:
-				params['s'] = thisrequestinfo['seed']
+				params['s'] = mirror['seed']
 
 			#send the params, rcvlet will check response
-			session.sendmessage(thisrequestinfo['mirrorinfo']['socket'], "P" + msgpack.packb(params))
+			session.sendmessage(mirror['info']['sock'], "P" + msgpack.packb(params))
 
 			# start separate receiving thread for this socket
-			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['mirrorinfo']['ip'], thisrequestinfo['mirrorinfo']['port']))))
-			thisrequestinfo['rt'] = t
+			t = threading.Thread(target=rcvlet, args=[mirror, self], name=("rcv_thread_" + str((mirror['info']['ip'], mirror['info']['port']))))
+			mirror['rt'] = t
 			t.start()
 
 
@@ -562,13 +527,13 @@ class RandomXORRequestorChunks(Requestor):
 			while len(blockchunks)>0:
 
 				#iterate through mirrors
-				for thisrequestinfo in self.activemirrorinfolist:
+				for mirror in self.activemirrors:
 
 					#dicitonary of chunk requests
 					chunks = {}
 
 					#iterate through r-1 random chunks, skipping the head (flip) chunk
-					for c in thisrequestinfo['chunknumbers'][1:]:
+					for c in mirror['chunknumbers'][1:]:
 
 						#pick correct length in bits
 						if c == self.privacythreshold - 1:
@@ -578,22 +543,22 @@ class RandomXORRequestorChunks(Requestor):
 
 						if rng:
 							#set random bytes for the latter chunk(s) from AES (will be deleted later)
-							chunks[c] = raidpirlib.nextrandombitsAES(thisrequestinfo['cipher'], length)
+							chunks[c] = lib.nextrandombitsAES(mirror['cipher'], length)
 
 						else:
 							#set random bytes for the latter chunk(s) randomly
-							chunks[c] = raidpirlib.randombits(length)
+							chunks[c] = lib.randombits(length)
 
-					thisrequestinfo['blockchunklist'].append(chunks)
+					mirror['blockchunklist'].append(chunks)
 
 				#list of blocknumbers
 				blocks = []
 
 				# now derive the first chunks
-				for thisrequestinfo in self.activemirrorinfolist:
+				for mirror in self.activemirrors:
 
 					#number of the first chunk
-					c = thisrequestinfo['chunknumbers'][0]
+					c = mirror['chunknumbers'][0]
 
 					#pick correct length for the chunk
 					if c == self.privacythreshold - 1:
@@ -602,10 +567,10 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = raidpirlib.bits_to_bytes(length)*'\0'
+					thisbitstring = lib.bits_to_bytes(length)*'\0'
 
 					#xor all other rnd chunks onto it
-					for rqi in self.activemirrorinfolist:
+					for rqi in self.activemirrors:
 						if c in rqi['blockchunklist'][-1]:
 							thisbitstring = xordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
 							if rng:
@@ -614,13 +579,13 @@ class RandomXORRequestorChunks(Requestor):
 					#if there is a block within this chunk, then add it to the bitstring by flipping the bit
 					if c in blockchunks:
 						blocknum = blockchunks[c].pop(0)
-						thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocknum - c*self.chunklen)
+						thisbitstring = lib.flip_bitstring_bit(thisbitstring, blocknum - c*self.chunklen)
 						blocks.append(blocknum)
 						if len(blockchunks[c]) == 0:
 							del blockchunks[c]
 
-					thisrequestinfo['parallelblocksneeded'].append(blocks)
-					thisrequestinfo['blockchunklist'][-1][c] = thisbitstring
+					mirror['parallelblocksneeded'].append(blocks)
+					mirror['blockchunklist'][-1][c] = thisbitstring
 
 
 		#single block query:
@@ -629,12 +594,12 @@ class RandomXORRequestorChunks(Requestor):
 			for blocknum in blocklist:
 
 				#iterate through mirrors
-				for thisrequestinfo in self.activemirrorinfolist:
+				for mirror in self.activemirrors:
 
 					chunks = {}
 
 					#iterate through r-1 random chunks
-					for c in thisrequestinfo['chunknumbers'][1:]:
+					for c in mirror['chunknumbers'][1:]:
 
 						#pick correct length in bits
 						if c == self.privacythreshold - 1:
@@ -643,19 +608,19 @@ class RandomXORRequestorChunks(Requestor):
 							length = self.chunklen
 
 						if rng:
-							chunks[c] = raidpirlib.nextrandombitsAES(thisrequestinfo['cipher'], length)
+							chunks[c] = lib.nextrandombitsAES(mirror['cipher'], length)
 
 						else:
 							#set random bytes for the latter chunk(s)
-							chunks[c] = raidpirlib.randombits(length)
+							chunks[c] = lib.randombits(length)
 
-					thisrequestinfo['blockchunklist'].append(chunks)
+					mirror['blockchunklist'].append(chunks)
 
 				# now derive the first chunks
-				for thisrequestinfo in self.activemirrorinfolist:
+				for mirror in self.activemirrors:
 
 					#number of the first chunk
-					c = thisrequestinfo['chunknumbers'][0]
+					c = mirror['chunknumbers'][0]
 
 					#pick correct length for the chunk
 					if c == self.privacythreshold - 1:
@@ -664,10 +629,10 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = raidpirlib.bits_to_bytes(length)*'\0'
+					thisbitstring = lib.bits_to_bytes(length)*'\0'
 
 					#xor all other rnd chunks onto it
-					for rqi in self.activemirrorinfolist:
+					for rqi in self.activemirrors:
 						if c in rqi['blockchunklist'][-1]:
 							thisbitstring = xordatastore.do_xor(thisbitstring, rqi['blockchunklist'][-1][c])
 							if rng:
@@ -675,9 +640,9 @@ class RandomXORRequestorChunks(Requestor):
 
 					#if the desired block is within this chunk, flip the bit
 					if c*self.chunklen <= blocknum and blocknum < c*self.chunklen + length:
-						thisbitstring = raidpirlib.flip_bitstring_bit(thisbitstring, blocknum - c*self.chunklen)
+						thisbitstring = lib.flip_bitstring_bit(thisbitstring, blocknum - c*self.chunklen)
 
-					thisrequestinfo['blockchunklist'][-1][c] = thisbitstring
+					mirror['blockchunklist'][-1][c] = thisbitstring
 
 
 		########################################
@@ -718,20 +683,18 @@ class RandomXORRequestorChunks(Requestor):
 
 		"""
 
-		requestinfo = self.activemirrorinfolist[tid]
+		requestinfo = self.activemirrors[tid]
 
 
 		if self.parallel:
 			if len(requestinfo['parallelblocksneeded']) == 0:
 				return ()
-			# otherwise set it to be taken...
-			requestinfo['servingrequest'] = True
 
 			blocknums = requestinfo['parallelblocksneeded'].pop(0)
 			requestinfo['blocksrequested'].append(blocknums)
 
 			if self.rng:
-				return (requestinfo['mirrorinfo'], blocknums, requestinfo['blockchunklist'].pop(0), 2)
+				return (requestinfo['info'], blocknums, requestinfo['blockchunklist'].pop(0), 2)
 			else:
 				raise Exception("Parallel Query without RNG not yet implemented!")
 
@@ -741,16 +704,13 @@ class RandomXORRequestorChunks(Requestor):
 			if len(requestinfo['blocksneeded']) == 0:
 				return ()
 
-			# otherwise set it to be taken...
-			requestinfo['servingrequest'] = True
-
 			blocknum = requestinfo['blocksneeded'].pop(0)
 			requestinfo['blocksrequested'].append(blocknum)
 
 			if self.rng:
-				return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 1)
+				return (requestinfo['info'], blocknum, requestinfo['blockchunklist'].pop(0), 1)
 			else:
-				return (requestinfo['mirrorinfo'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
+				return (requestinfo['info'], blocknum, requestinfo['blockchunklist'].pop(0), 0)
 
 
 	def notify_failure(self, xorrequesttuple):
@@ -784,12 +744,11 @@ class RandomXORRequestorChunks(Requestor):
 			failedmirrorsinfo = xorrequesttuple[0]
 
 			# now, let's find the activemirror this corresponds to.
-			for activemirrorinfo in self.activemirrorinfolist:
-				if activemirrorinfo['mirrorinfo'] == failedmirrorsinfo:
+			for mirror in self.activemirrors:
+				if mirror['info'] == failedmirrorsinfo:
 
 					# let's mark it as inactive and set up a different mirror
-					activemirrorinfo['mirrorinfo'] = nextmirrorinfo
-					activemirrorinfo['servingrequest'] = False
+					mirror['info'] = nextmirrorinfo
 					return
 
 			raise Exception("InternalError: Unknown mirror in notify_failure")
@@ -827,12 +786,12 @@ class RandomXORRequestorChunks(Requestor):
 		try:
 
 			# now, let's find the activemirror this corresponds to.
-			for activemirrorinfo in self.activemirrorinfolist:
-				if activemirrorinfo['mirrorinfo'] == thismirrorsinfo:
+			for mirror in self.activemirrors:
+				if mirror['info'] == thismirrorsinfo:
 
 					if self.parallel:
 						#use blocknumbers[0] as index from now on
-						blocknumbers = activemirrorinfo['blocksrequested'].pop(0)
+						blocknumbers = mirror['blocksrequested'].pop(0)
 
 						# add the xorblocks to the dict
 						self.returnedxorblocksdict[blocknumbers[0]].append(msgpack.unpackb(xorblock))
@@ -854,9 +813,9 @@ class RandomXORRequestorChunks(Requestor):
 							index = min(blocknumber/self.chunklen, self.privacythreshold-1)
 
 							# let's check the hash...
-							resultingblockhash = raidpirlib.find_hash(resultingblockdict[index], self.manifestdict['hashalgorithm'])
+							resultingblockhash = lib.find_hash(resultingblockdict[index], self.manifestdict['hashalgorithm'])
 							if resultingblockhash != self.manifestdict['blockhashlist'][blocknumber]:
-								print activemirrorinfo
+								print mirror
 								# TODO: We should notify the vendor!
 								raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt, for blocknumber ' + str(blocknumber))
 
@@ -873,7 +832,7 @@ class RandomXORRequestorChunks(Requestor):
 					#single block query:
 					else:
 					# remove the block and bitstring (asserting they match what we said before)
-						blocknumber = activemirrorinfo['blocksrequested'].pop(0)
+						blocknumber = mirror['blocksrequested'].pop(0)
 
 						# add the xorblock to the dict
 						self.returnedxorblocksdict[blocknumber].append(xorblock)
@@ -886,9 +845,9 @@ class RandomXORRequestorChunks(Requestor):
 						resultingblock = _reconstruct_block(self.returnedxorblocksdict[blocknumber])
 
 						# let's check the hash...
-						resultingblockhash = raidpirlib.find_hash(resultingblock, self.manifestdict['hashalgorithm'])
+						resultingblockhash = lib.find_hash(resultingblock, self.manifestdict['hashalgorithm'])
 						if resultingblockhash != self.manifestdict['blockhashlist'][blocknumber]:
-							print activemirrorinfo
+							print mirror
 							# TODO: We should notify the vendor!
 							raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt')
 

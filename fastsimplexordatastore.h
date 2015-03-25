@@ -1,4 +1,4 @@
-/* Author: Justin Cappos
+/* Author: Daniel Demmler / Justin Cappos
  * Inspired by code from Geremy Condra
  * File: fastsimplexordatastore.h
  * Purpose: The header file for the fastsimplexordatastore
