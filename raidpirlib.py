@@ -48,7 +48,7 @@ from Crypto.Util import Counter
 import time
 _timer = time.time
 
-pirversion = "v0.9.2"
+pirversion = "v0.9.3"
 
 # Exceptions...
 class FileNotFound(Exception):
@@ -454,7 +454,7 @@ def parse_manifest(rawmanifestdata):
 	return manifestdict
 
 
-def populate_xordatastore(manifestdict, xordatastore, rootdir="."):
+def populate_xordatastore(manifestdict, xordatastore, datasource, dstype):
 	"""
 	<Purpose>
 		Adds the files listed in the manifestdict to the datastore
@@ -464,12 +464,12 @@ def populate_xordatastore(manifestdict, xordatastore, rootdir="."):
 
 		xordatastore: the XOR datastore that we should populate.
 
-		rootdir: The location to look for the files mentioned in the manifest
+		datasource: The location to look for the files mentioned in the manifest
 
 	<Exceptions>
-		TypeError if the manifest is corrupt or the rootdir is the wrong type.
+		TypeError if the manifest is corrupt or the datasource is the wrong type.
 
-		FileNotFound if the rootdir does not contain a manifest file.
+		FileNotFound if the datasource does not contain a manifest file.
 
 		IncorrectFileContents if the file listed in the manifest file has the wrong size or hash
 
@@ -483,10 +483,13 @@ def populate_xordatastore(manifestdict, xordatastore, rootdir="."):
 	if type(manifestdict) != dict:
 		raise TypeError("Manifest dict must be a dictionary")
 
-	if type(rootdir) != str and type(rootdir) != unicode:
+	if type(datasource) != str and type(datasource) != unicode:
 		raise TypeError("Mirror root must be a string")
 
-	_add_data_to_datastore(xordatastore, manifestdict['fileinfolist'], rootdir, manifestdict['hashalgorithm'])
+	if dstype == "mmap":
+		_mmap_database(xordatastore, datasource)
+	else: # RAM
+		_add_data_to_datastore(xordatastore, manifestdict['fileinfolist'], datasource, manifestdict['hashalgorithm'])
 
 	hashlist = _compute_block_hashlist_fromdatastore(xordatastore, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
 
@@ -494,8 +497,11 @@ def populate_xordatastore(manifestdict, xordatastore, rootdir="."):
 
 		if hashlist[blocknum] != manifestdict['blockhashlist'][blocknum]:
 			raise TypeError("Despite matching file hashes, block '" + str(blocknum) + "' has an invalid hash.\nCorrupt manifest or dirty xordatastore")
-
 	# We're done!
+
+
+def _mmap_database(xordatastore, dbname):
+	xordatastore.initialize(dbname)
 
 
 def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm):
@@ -770,7 +776,7 @@ def _write_db(startdirectory, dbname):
 	oo = open(dbname, 'w')
 
 	# Header
-	oo.write("RAIDPIR_DB")
+	oo.write("RAIDPIRDB_v0.9.3")
 
 	# let's walk through the directories and add the files + sizes
 	for parentdir, junkchilddirectories, filelist in os.walk(startdirectory):

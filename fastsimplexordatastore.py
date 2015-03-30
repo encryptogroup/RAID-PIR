@@ -15,6 +15,7 @@
 """
 
 import fastsimplexordatastore_c
+import mmapxordatastore_c
 import math
 
 
@@ -43,13 +44,15 @@ class XORDatastore(object):
 
 	# this is the private, internal storage area for data...
 	ds = None
+	dsobj = None
 
 	# these are public so that a caller can read information about a created
 	# datastore.   They should not be changed.
 	numberofblocks = None
 	sizeofblocks = None
+	dstype = ""
 
-	def __init__(self, block_size, num_blocks):  # allocate
+	def __init__(self, block_size, num_blocks, dstype, dbname):  # allocate
 		"""
 		<Purpose>
 			Allocate a place to store data for efficient XOR.
@@ -83,8 +86,14 @@ class XORDatastore(object):
 
 		self.numberofblocks = num_blocks
 		self.sizeofblocks = block_size #in byte
+		self.dstype = dstype
 
-		self.ds = fastsimplexordatastore_c.Allocate(block_size, num_blocks)
+		if dstype == "mmap":
+			self.ds = mmapxordatastore_c.Initialize(block_size, num_blocks, dbname)
+			self.dsobj = mmapxordatastore_c
+		else: # RAM
+			self.ds = fastsimplexordatastore_c.Allocate(block_size, num_blocks)
+			self.dsobj = fastsimplexordatastore_c
 
 
 	def produce_xor_from_bitstring(self, bitstring):
@@ -112,7 +121,7 @@ class XORDatastore(object):
 		if len(bitstring) != math.ceil(self.numberofblocks/8.0):
 			raise TypeError("bitstring is not of the correct length")
 
-		return fastsimplexordatastore_c.Produce_Xor_From_Bitstring(self.ds, bitstring)
+		return self.dsobj.Produce_Xor_From_Bitstring(self.ds, bitstring)
 
 
 	def produce_xor_from_multiple_bitstrings(self, bitstring, num_strings):
@@ -141,7 +150,7 @@ class XORDatastore(object):
 		if len(bitstring) != math.ceil(self.numberofblocks / 8.0) * num_strings :
 			raise TypeError("bitstring is not of the correct length")
 
-		return fastsimplexordatastore_c.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
+		return self.dsobj.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
 
 
 	def set_data(self, offset, data_to_add):
@@ -175,7 +184,7 @@ class XORDatastore(object):
 		if offset + len(data_to_add) > self.numberofblocks * self.sizeofblocks:
 			raise TypeError("Offset + added data overflows the XORdatastore")
 
-		return fastsimplexordatastore_c.SetData(self.ds, offset, data_to_add)
+		return self.dsobj.SetData(self.ds, offset, data_to_add)
 
 
 	def get_data(self, offset, quantity):
@@ -210,7 +219,7 @@ class XORDatastore(object):
 		if offset + quantity > self.numberofblocks * self.sizeofblocks:
 			raise TypeError("Quantity + offset is larger than XORdatastore")
 
-		return fastsimplexordatastore_c.GetData(self.ds, offset, quantity)
+		return self.dsobj.GetData(self.ds, offset, quantity)
 
 
 	def __del__(self):   # deallocate
@@ -227,4 +236,4 @@ class XORDatastore(object):
 		"""
 		# if there is an error, this might be an uninitialized object...
 		if self.ds != None:
-			fastsimplexordatastore_c.Deallocate(self.ds)
+			self.dsobj.Deallocate(self.ds)

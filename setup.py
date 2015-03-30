@@ -21,9 +21,14 @@ fastsimpledatastore_c = Extension("fastsimplexordatastore_c",
 		#extra_compile_args=["-msse2", "-mstackrealign"] #might be required on some systems
 		)
 
+mmapdatastore_c = Extension("mmapxordatastore_c",
+		sources=["mmapxordatastore.c"]
+		#extra_compile_args=["-msse2", "-mstackrealign"] #might be required on some systems
+		)
+
 setup(	name="RAID-PIR",
-		version="0.9.0",
-		ext_modules=[fastsimpledatastore_c],
+		version="0.9.3",
+		ext_modules=[fastsimpledatastore_c, mmapdatastore_c],
 		description="""An early version of RAID-PIR with a simple C-based xordatastore.""",
 		author="Daniel Demmler",
 		author_email="daniel.demmler@ec-spride.de",

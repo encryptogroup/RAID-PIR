@@ -491,9 +491,11 @@ def parse_options():
 	parser.add_option("", "--httpport", dest="httpport", type="int",
 				default=80, help="Serve HTTP clients on this port (default 80)")
 
-	parser.add_option("", "--files", dest="files", type="string",
-				metavar="dir", default=".",
+	parser.add_option("-f", "--files", dest="files", type="string",
+				metavar="dir", default=None,
 				help="The base directory where all mirror files are located.")
+
+	parser.add_option("-d", "--database", dest="database", metavar="filename", type="string", default=None, help="Read this database file.")
 
 	parser.add_option("", "--retrievemanifestfrom", dest="retrievemanifestfrom",
 				type="string", metavar="vendorIP:port", default="",
@@ -538,6 +540,10 @@ def parse_options():
 		print "Unknown options", remainingargs
 		sys.exit(1)
 
+	if not (_commandlineoptions.database == None) ^ (_commandlineoptions.files == None):
+		print "Must specify either files or database"
+		sys.exit(1)
+
 	# try to open the log file...
 	#_logfo = open(_commandlineoptions.logfilename, 'a')
 
@@ -573,10 +579,18 @@ def main():
 	if _commandlineoptions.daemonize:
 		daemon.daemonize()
 
-	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'])
+	if _commandlineoptions.database != None:
+		dstype = "mmap"
+		source = _commandlineoptions.database
+	else:
+		dstype = "RAM"
+		source = _commandlineoptions.files
 
-	# now let's put the content in the datastore in preparation to serve it
-	lib.populate_xordatastore(manifestdict, myxordatastore, rootdir=_commandlineoptions.files)
+	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'], dstype, source)
+
+	if dstype == "RAM":
+		# now let's put the content in the datastore in preparation to serve it
+		lib.populate_xordatastore(manifestdict, myxordatastore, source, dstype)
 
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')
