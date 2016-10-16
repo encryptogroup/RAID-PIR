@@ -37,12 +37,7 @@ See below
 #
 # EXTENSION POINTS:
 #
-# To change the way that files are mapped to blocks, one should create a
-# function and add it to: _offsetoptionname_to_functionmap.   This can be
-# used to cause files to intentionally span blocks (or not span blocks) to
-# better mask what is downloaded.
-#
-# The manifest file could also be extended to support huge files (those that
+# The manifest file could be extended to support huge files (those that
 # span multiple releases).   This would primarily require client changes, but
 # it may be useful to add metadata to the manifest to further indicate
 # information about how to stitch these files back together.
@@ -60,11 +55,6 @@ if sys.version_info[0] != 2 or sys.version_info[1] != 7:
 	sys.exit(1)
 
 import msgpack
-
-# This says which function corresponds to an option
-_offsetoptionname_to_functionmap = {'nogaps':lib.nogaps_offset_assignment_function}
-
-
 
 
 def parse_options():
@@ -105,7 +95,7 @@ def parse_options():
 
 	parser.add_option("-o", "--offsetalgorithm", dest="offsetalgorithm",
 				type="string", metavar="algorithm", default="nogaps",
-				help="Chooses how to put the files into blocks (default is nogaps). Currently only nogaps is supported.")
+				help="Chooses how to put the files into blocks (default is 'nogaps'). Use 'eqdist' for uniform distribution of the data entries.")
 
 	parser.add_option("-d", "--database", dest="database", metavar="filename", type="string", default=None, help="Create a single database file with this name and copy files into it.")
 
@@ -114,15 +104,6 @@ def parse_options():
 	(commandlineoptions, remainingargs) = parser.parse_args()
 
 	# check the arguments
-	if commandlineoptions.offsetalgorithm not in _offsetoptionname_to_functionmap:
-		print "Unknown offsetalgorithm, try one of:", _offsetoptionname_to_functionmap.keys()
-		sys.exit(1)
-
-	# replace the string with a function reference.
-	# JAC: Stylistically, I don't like this, but I don't know an easy way
-	# to improve it.
-	commandlineoptions.offsetalgorithm = _offsetoptionname_to_functionmap[commandlineoptions.offsetalgorithm]
-
 	if len(remainingargs) != 3:
 		print "Requires exactly three additional arguments: rootdir blocksize vendorhostname"
 		sys.exit(1)
@@ -159,7 +140,7 @@ if __name__ == '__main__':
 	manifestdict = lib.create_manifest(rootdir=commandlineoptions.rootdir,
 		hashalgorithm=commandlineoptions.hashalgorithm,
 		block_size=commandlineoptions.blocksize,
-		offset_assignment_function=commandlineoptions.offsetalgorithm,
+		datastore_layout=commandlineoptions.offsetalgorithm,
 		vendorhostname=commandlineoptions.vendorhostname,
 		vendorport=commandlineoptions.vendorport)
 

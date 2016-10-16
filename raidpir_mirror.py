@@ -1,3 +1,4 @@
+#!/bin/python2
 """
 <Author>
 	Daniel Demmler
@@ -83,6 +84,7 @@ def _log(stringtolog):
 
 _global_myxordatastore = None
 _global_manifestdict = None
+_request_restart = False
 
 
 #################### Advertising ourself with the vendor ######################
@@ -165,6 +167,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		global _xorstrings
 		global _finish
 		global _batch_comp_time
+		global _global_myxordatastore
+		global _global_manifestdict
+		global _request_restart
 
 		_finish = False
 		comp_time = 0
@@ -284,6 +289,10 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				#done!
 
+			elif requeststring == 'MANIFEST UPDATE':
+				print "MANIFEST UPDATE"
+				_request_restart = True
+
 			elif requeststring.startswith('M'):
 				parallel = True
 
@@ -396,12 +405,14 @@ def service_raidpir_clients(myxordatastore, ip, port):
 	assert _global_myxordatastore != None
 
 	# create the handler / server
-	xorserver = ThreadedXORServer((ip, port), ThreadedXORRequestHandler)
+	xorserver = ThreadedXORServer(('0.0.0.0', port), ThreadedXORRequestHandler)
 
 	# and serve forever!   This call will not return which is why we spawn a new thread to handle it
 	t = threading.Thread(target=xorserver.serve_forever, name="RAID-PIR mirror server")
 	t.daemon = True
 	t.start()
+
+	return xorserver
 
 
 ################################ Serve via HTTP ###############################
@@ -454,6 +465,27 @@ def service_http_clients(myxordatastore, manifestdict, ip, port):
 	# and serve forever! Just like with RAID-PIR, this doesn't return so we need a new thread...
 	threading.Thread(target=httpserver.serve_forever, name="HTTP server").start()
 
+########################## Retrieve the manifest dict ##########################
+def retrieve_manifest_dict():
+	global _commandlineoptions
+
+	# If we were asked to retrieve the mainfest file, do so...
+	if _commandlineoptions.retrievemanifestfrom:
+		# We need to download this file...
+		rawmanifestdata = lib.retrieve_rawmanifest(_commandlineoptions.retrievemanifestfrom)
+
+		# ...make sure it is valid...
+		manifestdict = lib.parse_manifest(rawmanifestdata)
+
+		# ...and write it out if it's okay
+		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
+
+	else:
+		# Simply read it in from disk
+		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+		manifestdict = lib.parse_manifest(rawmanifestdata)
+
+	return manifestdict
 
 ########################### Option parsing and main ###########################
 _commandlineoptions = None
@@ -517,6 +549,10 @@ def parse_options():
 				type="int", default=60,
 				help="How many seconds should I wait between vendor notifications? (default 60).")
 
+	parser.add_option("", "--precompute", dest="use_precomputed_data",
+				action="store_true", default=False,
+				help="Use 4Russian precomputation to speedup PIR responses.")
+
 	parser.add_option("", "--vendorip", dest="vendorip", type="string", metavar="IP",
 				default=None, help="Vendor IP for overwriting the value from manifest")
 
@@ -545,7 +581,7 @@ def parse_options():
 		sys.exit(1)
 
 	# try to open the log file...
-	#_logfo = open(_commandlineoptions.logfilename, 'a')
+	_logfo = open(_commandlineoptions.logfilename, 'a')
 
 
 def main():
@@ -555,23 +591,9 @@ def main():
 	global _batchevent
 	global _xorstrings
 	global _batchrequests
+	global _request_restart
 
-	# If we were asked to retrieve the mainfest file, do so...
-	if _commandlineoptions.retrievemanifestfrom:
-		# We need to download this file...
-		rawmanifestdata = lib.retrieve_rawmanifest(_commandlineoptions.retrievemanifestfrom)
-
-		# ...make sure it is valid...
-		manifestdict = lib.parse_manifest(rawmanifestdata)
-
-		# ...and write it out if it's okay
-		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
-
-
-	else:
-		# Simply read it in from disk
-		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
-		manifestdict = lib.parse_manifest(rawmanifestdata)
+	manifestdict = retrieve_manifest_dict()
 
 	# We should detach here.   I don't do it earlier so that error
 	# messages are written to the terminal...   I don't do it later so that any
@@ -580,17 +602,23 @@ def main():
 		daemon.daemonize()
 
 	if _commandlineoptions.database != None:
+		print "Using mmap datastore"
 		dstype = "mmap"
 		source = _commandlineoptions.database
 	else:
+		print "Using RAM datastore"
 		dstype = "RAM"
 		source = _commandlineoptions.files
 
-	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'], dstype, source)
+	myxordatastore = fastsimplexordatastore.XORDatastore(manifestdict['blocksize'], manifestdict['blockcount'], dstype, source, _commandlineoptions.use_precomputed_data)
 
 	if dstype == "RAM":
 		# now let's put the content in the datastore in preparation to serve it
-		lib.populate_xordatastore(manifestdict, myxordatastore, source, dstype)
+		print "Loading data into RAM datastore..."
+		start = time.clock()
+		lib.populate_xordatastore(manifestdict, myxordatastore, source, dstype, _commandlineoptions.use_precomputed_data)
+		elapsed = (time.clock() - start)
+		print "Datastore initialized. Took %f seconds." % elapsed
 
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')
@@ -604,7 +632,7 @@ def main():
 	_xorstrings = ""
 
 	# first, let's fire up the RAID-PIR server
-	service_raidpir_clients(myxordatastore, _commandlineoptions.ip, _commandlineoptions.port)
+	xorserver = service_raidpir_clients(myxordatastore, _commandlineoptions.ip, _commandlineoptions.port)
 
 	# If I should serve legacy clients via HTTP, let's start that up...
 	if _commandlineoptions.http:
@@ -615,14 +643,24 @@ def main():
 
 	# let's send the mirror information periodically...
 	# we should log any errors...
+	_send_mirrorinfo()
+	counter = 0
+
 	while True:
-		try:
-			_send_mirrorinfo()
-		except Exception, e:
-			_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
+		if counter > _commandlineoptions.mirrorlistadvertisedelay:
+			counter = 0
+			try:
+				_send_mirrorinfo()
+			except Exception, e:
+				_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 
-		time.sleep(_commandlineoptions.mirrorlistadvertisedelay)
+		if _request_restart:
+			print "Shutting down"
+			xorserver.shutdown()
+			sys.exit(0)
 
+		counter = counter + 1
+		time.sleep(1)
 
 if __name__ == '__main__':
 	print "RAID-PIR mirror", lib.pirversion

@@ -48,7 +48,7 @@ from Crypto.Util import Counter
 import time
 _timer = time.time
 
-pirversion = "v0.9.3"
+pirversion = "v0.9.4"
 
 # Exceptions...
 class FileNotFound(Exception):
@@ -59,8 +59,8 @@ class IncorrectFileContents(Exception):
 
 
 # these keys must exist in a manifest dictionary.
-_required_manifest_keys_regular = ['manifestversion', 'blocksize', 'blockcount', 'blockhashlist', 'hashalgorithm', 'vendorhostname', 'vendorport', 'manifesthash', 'fileinfolist']
-_required_manifest_keys = ['manifestversion', 'blocksize', 'blockcount', 'hashalgorithm', 'vendorhostname', 'vendorport', 'manifesthash', 'fileinfolist']
+_required_manifest_keys_regular = ['manifestversion', 'blocksize', 'blockcount', 'blockhashlist', 'hashalgorithm', 'vendorhostname', 'vendorport', 'fileinfolist']
+_required_manifest_keys = ['manifestversion', 'blocksize', 'blockcount', 'hashalgorithm', 'vendorhostname', 'vendorport', 'fileinfolist']
 
 
 # the original implementation, used in mirrors that hold data in RAM
@@ -85,34 +85,34 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 	return currenthashlist
 
 
-# implementation to read every file from disk to prevent ram from filling up. used for creating manifest.
+# implementation to read every file from disk to prevent ram from filling up. used for creating nogaps manifest.
 def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgorithm):
 	"""private helper, used both the compute and check hashes"""
 
 	print "Calculating block hashes with algorithm", hashalgorithm, "..."
 
-	currenthashlist = []
-
-	if hashalgorithm == 'noop' or hashalgorithm == 'none' or hashalgorithm == None:
-		for _ in xrange(blockcount):
-			currenthashlist.append('')
+	if hashalgorithm in ['noop', 'none', None]:
+		currenthashlist = ['']*blockcount
 		return currenthashlist
 
+	currenthashlist = []
 	lastoffset = 0
 	thisblock = ""
-	pt = blockcount / 10
+	pt = blockcount / 20
 	nextprint = pt
 
 	for blocknum in xrange(blockcount):
 
 		if blockcount > 99 and blocknum >= nextprint:
-			print blocknum, "/", blockcount, "done..."
+			print blocknum, "/", blockcount,\
+				  "("+str(int(round(blocknum*1.0/blockcount*100)))+"%) done..."
 			nextprint = nextprint + pt
 
 		while len(thisblock) < blocksize:
 
 			if lastoffset in offsetdict:
 				fd = open(offsetdict[lastoffset])
+				print "reading", offsetdict[lastoffset]
 
 				thisfilecontents = fd.read()
 				fd.close()
@@ -159,7 +159,6 @@ _supported_hashalgorithms = ['md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha51
 
 _supported_hashencodings = ['hex', 'raw']
 
-
 def find_hash(contents, algorithm):
 	"""Helper function for hashing"""
 
@@ -182,9 +181,11 @@ def find_hash(contents, algorithm):
 	if hashencoding not in _supported_hashencodings:
 		raise TypeError("Do not understand hash encoding: '" + algorithm + "'")
 
-	hashobj = hashlib.new(hashalgorithmname)
-
-	hashobj.update(contents)
+	if hashalgorithmname == 'sha256':
+		hashobj = hashlib.sha256(contents)
+	else:
+		hashobj = hashlib.new(hashalgorithmname)
+		hashobj.update(contents)
 
 	if hashencoding == 'raw':
 		return hashobj.digest()
@@ -329,7 +330,7 @@ def request_xorblock_chunked_rng_parallel(socket, chunks):
 	session.sendmessage(socket, "M" + msgpack.packb(chunks))
 
 
-def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
+def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=8901):
 	"""
 	<Purpose>
 		Retrieves the mirrorinfolist from a vendor.
@@ -454,7 +455,8 @@ def parse_manifest(rawmanifestdata):
 	return manifestdict
 
 
-def populate_xordatastore(manifestdict, xordatastore, datasource, dstype):
+def populate_xordatastore(manifestdict, xordatastore, datasource, dstype,
+						  precompute):
 	"""
 	<Purpose>
 		Adds the files listed in the manifestdict to the datastore
@@ -465,6 +467,10 @@ def populate_xordatastore(manifestdict, xordatastore, datasource, dstype):
 		xordatastore: the XOR datastore that we should populate.
 
 		datasource: The location to look for the files mentioned in the manifest
+
+		dstype: The type (RAM, memory-mapped) of the datastore
+
+		precompute: Specifies whether preprocessing should be performed
 
 	<Exceptions>
 		TypeError if the manifest is corrupt or the datasource is the wrong type.
@@ -489,7 +495,8 @@ def populate_xordatastore(manifestdict, xordatastore, datasource, dstype):
 	if dstype == "mmap":
 		_mmap_database(xordatastore, datasource)
 	else: # RAM
-		_add_data_to_datastore(xordatastore, manifestdict['fileinfolist'], datasource, manifestdict['hashalgorithm'])
+		_add_data_to_datastore(xordatastore, manifestdict['fileinfolist'], datasource, manifestdict['hashalgorithm'], manifestdict['datastore_layout'], manifestdict['blocksize'])
+
 
 	hashlist = _compute_block_hashlist_fromdatastore(xordatastore, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
 
@@ -499,20 +506,28 @@ def populate_xordatastore(manifestdict, xordatastore, datasource, dstype):
 			raise TypeError("Despite matching file hashes, block '" + str(blocknum) + "' has an invalid hash.\nCorrupt manifest or dirty xordatastore")
 	# We're done!
 
+	if precompute:
+		print("Preprocessing data...")
+		start = time.clock()
+		xordatastore.finalize()
+		elapsed = (time.clock() - start)
+		print "Preprocessing done. Took %f seconds." % elapsed
+
 
 def _mmap_database(xordatastore, dbname):
 	xordatastore.initialize(dbname)
 
 
-def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm):
+def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm, datastore_layout, blocksize):
 	# Private helper to populate the datastore
+	if not datastore_layout in ['nogaps', 'eqdist']:
+		raise ValueError("Unknown datastore layout: "+datastore_layout)
 
 	# go through the files one at a time and populate the xordatastore
 	for thisfiledict in fileinfolist:
 
 		thisrelativefilename = thisfiledict['filename']
 		thisfilehash = thisfiledict['hash']
-		thisoffset = thisfiledict['offset']
 		thisfilelength = thisfiledict['length']
 
 		thisfilename = os.path.join(rootdir, thisrelativefilename)
@@ -538,7 +553,22 @@ def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm):
 			raise IncorrectFileContents("File '" + thisrelativefilename + "' has the wrong hash")
 
 		# and add it to the datastore
-		xordatastore.set_data(thisoffset, thisfilecontents)
+		if datastore_layout == 'nogaps':
+			thisoffset = thisfiledict['offset']
+			xordatastore.set_data(thisoffset, thisfilecontents)
+		elif datastore_layout == 'eqdist':
+			offsets = thisfiledict['offsets']
+			offsetsoffset = 0
+			fileoffset = 0
+			while fileoffset < len(thisfilecontents):
+				block_remaining_bytes = blocksize - (offsets[offsetsoffset]%blocksize)
+				bytes_to_add = min(len(thisfilecontents)-fileoffset, block_remaining_bytes)
+
+				xordatastore.set_data(
+					offsets[offsetsoffset], thisfilecontents[fileoffset:fileoffset+bytes_to_add])
+
+				fileoffset += bytes_to_add
+				offsetsoffset += 1
 
 
 def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
@@ -585,7 +615,7 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 	print "Offset-Dict generated."
 
 
-def nogaps_offset_assignment_function(fileinfolist, rootdir, blocksize):
+def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgorithm):
 	"""
 	<Purpose>
 		Specifies how to map a set of files into offsets in an xordatastore.
@@ -608,6 +638,8 @@ def nogaps_offset_assignment_function(fileinfolist, rootdir, blocksize):
 		None
 	"""
 
+	print "Using `nogaps` algorithm."
+
 	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
 	# We also don't use the rootdir.   I think this is typical
 
@@ -616,6 +648,174 @@ def nogaps_offset_assignment_function(fileinfolist, rootdir, blocksize):
 	for thisfileinfo in fileinfolist:
 		thisfileinfo['offset'] = currentoffset
 		currentoffset = currentoffset + thisfileinfo['length']
+
+	blockcount = int(math.ceil(currentoffset * 1.0 / blocksize))
+
+	# let's ensure the offsets are valid...
+	# build a list of tuples with offset, etc. info...
+	offsetlengthtuplelist = []
+	for fileinfo in fileinfolist:
+		offsetlengthtuplelist.append((fileinfo['offset'], fileinfo['length']))
+
+	# ...sort the tuples so that it's easy to walk down them and check for
+	# overlapping entries...
+	offsetlengthtuplelist.sort()
+
+	# ...now, we need to ensure the values don't overlap.
+	nextfreeoffset = 0
+	for offset, length in offsetlengthtuplelist:
+		if offset < 0:
+			raise TypeError("Offset generation led to negative offset!")
+		if length < 0:
+			raise TypeError("File lengths must be positive!")
+
+		if nextfreeoffset > offset:
+			raise TypeError("Error! Offset generation led to overlapping files!")
+
+		# since this list is sorted by offset, this should ensure the property we want is upheld.
+		nextfreeoffset = offset + length
+
+	offsetdict = {}
+	_create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm)
+	print "Indexing done ..."
+
+	# and it is time to get the blockhashlist...
+	# manifestdict['blockhashlist'] = _compute_block_hashlist(offsetdict, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
+	blockhashlist = _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgorithm)
+
+	return blockhashlist
+
+
+def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgorithm):
+	"""
+	<Purpose>
+		Specifies how to map a set of files into offsets in an xordatastore.
+		This function distributes them equally over the database.
+
+	<Arguments>
+		fileinfolist: a list of dictionaries with file information
+
+		rootdir: the root directory where the files live
+
+		block_size: The size of a block of data.
+
+	<Exceptions>
+		TypeError, IndexError, or KeyError if the arguements are incorrect
+
+	<Side Effects>
+		Modifies the fileinfolist to add offset elements to each dict
+
+	<Returns>
+		None
+	"""
+
+	print "Using `eqdist` algorithm."
+
+	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
+	# We also don't use the rootdir.   I think this is typical
+
+	db_length = 0
+	for thisfileinfo in fileinfolist:
+		db_length = db_length + thisfileinfo['length']
+
+	blockcount = int(math.ceil(db_length * 1.0 / blocksize))
+
+	free_blocks = range(1, blockcount)
+	currentoffset = 0
+	currentblock = 0
+	last_block = -1
+
+	# progress counter
+	hashedblocks = 0
+	pt = blockcount*1.0/20
+	nextprint = pt
+
+	# define the hashlist for the block hashes
+	hashlist = ['']*blockcount
+	current_block_content = ""
+
+
+	for thisfileinfo in fileinfolist:
+		thisfileinfo['offsets'] = []
+
+		thisfilename = os.path.join(rootdir, thisfileinfo['filename'])
+		print "reading", thisfilename
+
+		# prevent access above rootdir
+		if not os.path.normpath(os.path.abspath(thisfilename)).startswith(os.path.abspath(rootdir)):
+			raise TypeError("File in manifest cannot go back from the root dir!!!")
+
+		# open the file for reading (to compute the hash for the current block)
+		fd = open(thisfilename)
+
+		remainingbytes = thisfileinfo['length']
+		blocks_per_file = thisfileinfo['length']*1.0 / blocksize
+		block_steps = max(2, int(blockcount/blocks_per_file))
+		current_step = 0
+
+		while remainingbytes > 0:
+			block_remaining_bytes = (blocksize - (currentoffset % blocksize))
+			thisfileinfo['offsets'].append(currentoffset)
+
+			bytes_to_add = min(remainingbytes, block_remaining_bytes)
+			remainingbytes -= bytes_to_add
+			currentoffset += bytes_to_add
+			current_block_content += fd.read(bytes_to_add)
+
+			if currentoffset % blocksize == 0 and len(free_blocks) != 0:
+				# block is full
+				last_block = currentoffset/blocksize - 1
+
+				# show progress
+				hashedblocks += 1
+				if blockcount > 99 and hashedblocks >= nextprint:
+					print hashedblocks, "/", blockcount,\
+						  "("+str(int(round(hashedblocks*1.0/blockcount*100)))+"%) done..."
+					nextprint = nextprint + pt
+
+
+				# calculate hash for block
+				hashlist[last_block] = find_hash(current_block_content, hashalgorithm)
+				current_block_content = ""
+
+				# find new free block
+				current_step += 1
+				block_candidate = (last_block + block_steps) % blockcount
+
+				while block_candidate not in free_blocks:
+					block_candidate += 1
+					if block_candidate == blockcount:
+						block_candidate = 0
+
+				free_blocks.remove(block_candidate)
+
+				currentoffset = block_candidate * blocksize
+				block_remaining_bytes = blocksize
+
+		# close the file descriptor
+		fd.close()
+		del fd
+
+
+	assert len(free_blocks) == 0
+
+	# the last block has to be padded to full block size
+	block_remaining_bytes = (blocksize - (currentoffset % blocksize))
+	current_block_content += block_remaining_bytes * "\0"
+
+	# calculate the hash for the last block
+	current_block = currentoffset/blocksize
+	hashlist[current_block] = find_hash(current_block_content, hashalgorithm)
+
+	for h in hashlist:
+		assert h != ''
+
+	#currentoffset = 0
+	#for thisfileinfo in fileinfolist:
+	#	thisfileinfo['offset'] = currentoffset
+	#	currentoffset = currentoffset + thisfileinfo['length']
+
+	return hashlist
 
 
 def _find_blockloc_from_offset(offset, sizeofblocks):
@@ -648,39 +848,54 @@ def extract_file_from_blockdict(filename, manifestdict, blockdict):
 	"""
 
 	blocksize = manifestdict['blocksize']
+	database_layout = manifestdict['datastore_layout']
 
 	for fileinfo in manifestdict['fileinfolist']:
 		if filename == fileinfo['filename']:
 
-			offset = fileinfo['offset']
-			quantity = fileinfo['length']
+			if database_layout == 'nogaps':
+				offset = fileinfo['offset']
+				quantity = fileinfo['length']
 
-			# Let's get the block information
-			(startblock, startoffset) = _find_blockloc_from_offset(offset, blocksize)
-			(endblock, endoffset) = _find_blockloc_from_offset(offset + quantity, blocksize)
+				# Let's get the block information
+				(startblock, startoffset) = _find_blockloc_from_offset(offset, blocksize)
+				(endblock, endoffset) = _find_blockloc_from_offset(offset + quantity, blocksize)
 
-			# Case 1: this does not cross blocks
-			if startblock == endblock:
-				return blockdict[startblock][startoffset:endoffset]
+				# Case 1: this does not cross blocks
+				if startblock == endblock:
+					return blockdict[startblock][startoffset:endoffset]
 
-			# Case 2: this crosses blocks
+				# Case 2: this crosses blocks
 
-			# we'll build up the string starting with the first block...
-			currentstring = blockdict[startblock][startoffset:]
+				# we'll build up the string starting with the first block...
+				currentstring = blockdict[startblock][startoffset:]
 
-			# now add in the 'middle' blocks.   This is all of the blocks
-			# after the start and before the end
-			for currentblock in range(startblock + 1, endblock):
-				currentstring += blockdict[currentblock]
+				# now add in the 'middle' blocks.   This is all of the blocks
+				# after the start and before the end
+				for currentblock in range(startblock + 1, endblock):
+					currentstring += blockdict[currentblock]
 
-			# this check is needed because we might be past the last block.
-			if endoffset > 0:
-				# finally, add the end block.
-				currentstring += blockdict[endblock][:endoffset]
+				# this check is needed because we might be past the last block.
+				if endoffset > 0:
+					# finally, add the end block.
+					currentstring += blockdict[endblock][:endoffset]
 
-			# and return the result
-			return currentstring
+				# and return the result
+				return currentstring
+			elif database_layout == 'eqdist':
+				offsets = fileinfo['offsets']
+				quantity = fileinfo['length']
 
+				currentstring = ''
+
+				for offset in offsets:
+					(block, blockoffset) = _find_blockloc_from_offset(offset, blocksize)
+					currentstring += blockdict[block][blockoffset:]
+
+				currentstring = currentstring[:quantity]
+				return currentstring
+			else:
+				raise Exception("Unknown database layout")
 
 def get_blocklist_for_file(filename, manifestdict):
 	"""
@@ -703,12 +918,23 @@ def get_blocklist_for_file(filename, manifestdict):
 		A list of blocks numbers
 	"""
 
+	blocksize = manifestdict['blocksize']
+
 	for fileinfo in manifestdict['fileinfolist']:
 		if filename == fileinfo['filename']:
-			# it's the starting offset / blocksize until the
-			# ending offset -1 divided by the blocksize
-			# I do + 1 because range will otherwise omit the last block
-			return range(fileinfo['offset'] / manifestdict['blocksize'], (fileinfo['offset'] + fileinfo['length'] - 1) / manifestdict['blocksize'] + 1)
+			if manifestdict['datastore_layout'] == 'nogaps':
+				# it's the starting offset / blocksize until the
+				# ending offset -1 divided by the blocksize
+				# I do + 1 because range will otherwise omit the last block
+				return range(fileinfo['offset'] / blocksize, (fileinfo['offset'] + fileinfo['length'] - 1) / blocksize + 1)
+			elif manifestdict['datastore_layout'] == 'eqdist':
+				offsets = fileinfo['offsets']
+				blocks = []
+				for offset in offsets:
+					blocks.append(offset/blocksize)
+				return blocks
+			else:
+				raise Exception("Unknown datastore layout")
 
 	raise TypeError("File is not in manifest")
 
@@ -853,7 +1079,7 @@ def flip_array_bit(ba, bitnum):
 	return ba
 
 
-def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1024, offset_assignment_function=nogaps_offset_assignment_function, vendorhostname=None, vendorport=62293):
+def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1024, datastore_layout="nogaps", vendorhostname=None, vendorport=62293):
 	"""
 	<Purpose>
 		Create a manifest
@@ -865,7 +1091,7 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 
 		block_size: The size of a block of data.
 
-		offset_assignment_function: specifies how to lay out the files in blocks.
+		datastore_layout: specifies how to lay out the files in blocks.
 
 	<Exceptions>
 		TypeError if the arguments are corrupt or of the wrong type
@@ -896,63 +1122,34 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 
 	manifestdict = {}
 
-	manifestdict['manifestversion'] = "1.0"
+	manifestdict['manifestversion'] = "2.0"
 	manifestdict['hashalgorithm'] = hashalgorithm
 	manifestdict['blocksize'] = block_size
 	manifestdict['vendorhostname'] = vendorhostname
 	manifestdict['vendorport'] = vendorport
+	manifestdict['datastore_layout'] = datastore_layout
 
 	# first get the file information
 	fileinfolist = _generate_fileinfolist(rootdir, manifestdict['hashalgorithm'])
 
-	# now let's assign the files to offsets as the caller requests...
-	offset_assignment_function(fileinfolist, rootdir, manifestdict['blocksize'])
-
-	# let's ensure the offsets are valid...
-
-	# build a list of tuples with offset, etc. info...
-	offsetlengthtuplelist = []
+	# Let's see how many blocks we need
+	db_length = 0
 	for fileinfo in fileinfolist:
-		offsetlengthtuplelist.append((fileinfo['offset'], fileinfo['length']))
+		db_length += fileinfo['length']
 
-	# ...sort the tuples so that it's easy to walk down them and check for
-	# overlapping entries...
-	offsetlengthtuplelist.sort()
+	manifestdict['blockcount'] = int(math.ceil(db_length * 1.0 / manifestdict['blocksize']))
 
-	# ...now, we need to ensure the values don't overlap.
-	nextfreeoffset = 0
-	for offset, length in offsetlengthtuplelist:
-		if offset < 0:
-			raise TypeError("Offset generation led to negative offset!")
-		if length < 0:
-			raise TypeError("File lengths must be positive!")
+	# now let's assign the files to offsets as the caller requests and create
+	# the hashes for the PIR blocks
+	if datastore_layout == "nogaps":
+		manifestdict['blockhashlist'] = datastore_layout_function_nogaps(fileinfolist, rootdir, manifestdict['blocksize'], hashalgorithm)
+	elif datastore_layout == "eqdist":
+		manifestdict['blockhashlist'] = datastore_layout_function_eqdist(fileinfolist, rootdir, manifestdict['blocksize'], hashalgorithm)
+	else:
+		print "Unknown datastore layout function. Try 'nogaps' or 'eqdist'"
+		sys.exit(1)
 
-		if nextfreeoffset > offset:
-			raise TypeError("Error! Offset generation led to overlapping files!")
-
-		# since this list is sorted by offset, this should ensure the property we want is upheld.
-		nextfreeoffset = offset + length
-
-	# great!   The fileinfolist is okay!
 	manifestdict['fileinfolist'] = fileinfolist
-
-
-	# The nextfreeoffset value is the end of the datastore...   Let's see how many blocks we need
-	manifestdict['blockcount'] = int(math.ceil(nextfreeoffset * 1.0 / manifestdict['blocksize']))
-
-
-	offsetdict = {}
-	print "Indexing done ..."
-
-	_create_offset_dict(offsetdict, manifestdict['fileinfolist'], rootdir, manifestdict['hashalgorithm'])
-
-	# and it is time to get the blockhashlist...
-	# manifestdict['blockhashlist'] = _compute_block_hashlist(offsetdict, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
-	manifestdict['blockhashlist'] = _compute_block_hashlist_fromdisk(offsetdict, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
-
-	# let's generate the manifest's hash
-	rawmanifest = msgpack.packb(manifestdict)
-	manifestdict['manifesthash'] = find_hash(rawmanifest, manifestdict['hashalgorithm'])
 
 	# we are done!
 	return manifestdict
