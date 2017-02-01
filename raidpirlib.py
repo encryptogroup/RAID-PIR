@@ -1161,33 +1161,21 @@ def randombits(bitlength):
 		Creates a random string with the supplied bitlength (the rightmost bits are zero if bitlength is not a multiple of 8)
 
 	<Arguments>
-		bitlength: the lenght of the randomness in bits (not Bytes)
+		bitlength: the length of the randomness in bits (not Bytes)
 
 	<Returns>
 		A random byte-string of supplied bitlength
 	"""
-	# offset for the last byte
-	bytelength = bits_to_bytes(bitlength)
-	bitoffset = bitlength % 16
+	assert bitlength != 0, "[randombits] bitlength should not be zero"
+	randombytes = os.urandom(bits_to_bytes(bitlength) - 1)
 
-	if bitoffset > 0:
-		# if the blockcount is not a multiple of 16, clear the rightmost bits
-		randombytes = os.urandom(bytelength - 2)
+	# additional_bits is the number of bits for the last byte
+	additional_bits = bitlength % 8
+	if bitlength % 8 == 0: additional_bits = 8
 
-		b = ord(os.urandom(1))
-		for i in range(8 - bitoffset):
-			b &= ~(1 << i)
-		b = chr(b)
-
-		if bitoffset<8:
-			randombytes += b
-			randombytes += "\0"
-		else:
-			randombytes += os.urandom(1)
-			randombytes += b
-		return randombytes
-	else:
-		return os.urandom(bytelength)
+	# let's add the additional_bits to the randombytes array
+	randombytes += chr(ord(os.urandom(1)) & ((0xff00 >> additional_bits) & 255))
+	return randombytes
 
 
 def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):

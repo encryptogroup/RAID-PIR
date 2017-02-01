@@ -225,7 +225,6 @@ class RandomXORRequestor(Requestor):
 		for thisrequestinfo in self.activemirrors[:-1]:
 
 			for _ in blocklist:
-				# TODO: FIXME: blockcount may be less than 2. in this case randombits throws an exception "ValueError: negative argument not allowed"
 				thisrequestinfo['blockbitstringlist'].append(lib.randombits(manifestdict['blockcount']))
 
 		# now, let's do the 'derived' ones...
