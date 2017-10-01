@@ -1,4 +1,4 @@
-#!/bin/python2
+#!/usr/bin/env python2
 """
 <Author>
 	Daniel Demmler
@@ -193,7 +193,6 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 			if requeststring.startswith('X'):
 
 				bitstring = requeststring[len('X'):]
-
 				expectedbitstringlength = lib.bits_to_bytes(_global_myxordatastore.numberofblocks)
 
 				if len(bitstring) != expectedbitstringlength:

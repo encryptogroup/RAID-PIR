@@ -89,7 +89,7 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgorithm):
 	"""private helper, used both the compute and check hashes"""
 
-	print "Calculating block hashes with algorithm", hashalgorithm, "..."
+	print "[INFO] Calculating block hashes with algorithm", hashalgorithm, "..."
 
 	if hashalgorithm in ['noop', 'none', None]:
 		currenthashlist = ['']*blockcount
@@ -112,7 +112,7 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 
 			if lastoffset in offsetdict:
 				fd = open(offsetdict[lastoffset])
-				print "reading", offsetdict[lastoffset]
+				print "[INFO] reading", offsetdict[lastoffset]
 
 				thisfilecontents = fd.read()
 				fd.close()
@@ -130,7 +130,7 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 
 		thisblock = thisblock[blocksize:]
 
-	print "All blocks done."
+	print "[INFO] All blocks done."
 	return currenthashlist
 
 
@@ -612,7 +612,7 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 		# and add it to the dict
 		offsetdict[thisoffset] = thisfilename
 
-	print "Offset-Dict generated."
+	print "[INFO] Offset-Dict generated."
 
 
 def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgorithm):
@@ -638,7 +638,7 @@ def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgor
 		None
 	"""
 
-	print "Using `nogaps` algorithm."
+	print "[INFO] Using `nogaps` algorithm."
 
 	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
 	# We also don't use the rootdir.   I think this is typical
@@ -677,7 +677,7 @@ def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgor
 
 	offsetdict = {}
 	_create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm)
-	print "Indexing done ..."
+	print "[INFO] Indexing done ..."
 
 	# and it is time to get the blockhashlist...
 	# manifestdict['blockhashlist'] = _compute_block_hashlist(offsetdict, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
@@ -709,7 +709,7 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 		None
 	"""
 
-	print "Using `eqdist` algorithm."
+	print "[INFO] Using `eqdist` algorithm."
 
 	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
 	# We also don't use the rootdir.   I think this is typical
@@ -739,7 +739,7 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 		thisfileinfo['offsets'] = []
 
 		thisfilename = os.path.join(rootdir, thisfileinfo['filename'])
-		print "reading", thisfilename
+		print "[INFO] reading", thisfilename
 
 		# prevent access above rootdir
 		if not os.path.normpath(os.path.abspath(thisfilename)).startswith(os.path.abspath(rootdir)):
@@ -992,7 +992,7 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-raw"):
 
 			fileinfo_list.append(thisfiledict)
 
-	print "Fileinfolist generation done."
+	print "[INFO] Fileinfolist generation done."
 	return fileinfo_list
 
 
