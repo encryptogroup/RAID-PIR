@@ -46,7 +46,7 @@
 # some sort of mechanism that gives the programmer control over how to handle
 # these.
 #
-# The XORRequestor interface is used to address these issues.   A programmer
+# The XORRequestor interface is used to address these issues.
 # The programmer defines an object that is provided the manifest,
 # mirrorlist, and blocks to retrieve.   The XORRequestor object must support
 # several methods: get_next_xorrequest(), notify_failure(xorrequest),
@@ -303,7 +303,6 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 	# let's figure out what blocks we need
 	for filename in requestedfilelist:
 		theseblocks = lib.get_blocklist_for_file(filename, manifestdict)
-		#print filename, theseblocks
 
 		# add the blocks we don't already know we need to request
 		for blocknum in theseblocks:
@@ -312,7 +311,6 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 
 	# do the actual retrieval work
 	blockdict = request_blocks_from_mirrors(neededblocks, manifestdict, redundancy, rng, parallel)
-
 
 	# now we should write out the files
 	for filename in requestedfilelist:

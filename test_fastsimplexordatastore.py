@@ -4,7 +4,7 @@ import fastsimplexordatastore
 
 size = 64 # block size in Byte
 num_blocks = 16 # number of blocks
-letterxordatastore = fastsimplexordatastore.XORDatastore(size, num_blocks)
+letterxordatastore = fastsimplexordatastore.XORDatastore(size, num_blocks, "ram", "db_name")
 
 startpos = 0
 for char in range(ord("A"), ord("Q")):
@@ -14,6 +14,8 @@ for char in range(ord("A"), ord("Q")):
 
 # can read data out...
 assert(letterxordatastore.get_data(size, 1) == 'B')
+
+letterxordatastore.finalize()
 
 # let's create a bitstring that uses A, C, and P.
 bitstring = chr(int('10100000', 2)) + chr(int('00000001',2))
@@ -76,8 +78,8 @@ else:
 	print "Was allowed to read past the end of the datastore"
 
 
-for blockcount in [9,15,16]:
-	letterxordatastore = fastsimplexordatastore.XORDatastore(size, blockcount)
+for blockcount in [9,14,15,16]:
+	letterxordatastore = fastsimplexordatastore.XORDatastore(size, blockcount, "ram", "db_name")
 
 	# is a 0 block the right size?
 	assert( len(letterxordatastore.produce_xor_from_bitstring(chr(0)*2)) == size )

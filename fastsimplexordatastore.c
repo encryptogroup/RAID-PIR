@@ -115,11 +115,104 @@ static PyObject *Allocate(PyObject *module, PyObject *args) {
 }
 
 
+// This method preprocesses the data using the 4-Russian technique
+static inline __m128i* do_preprocessing(long num_blocks, int block_size, long blocks_per_group, char* datastorebase) {
+	long num_groups = num_blocks/blocks_per_group;
+	long extra_rows = num_blocks%blocks_per_group;
+
+	// the last group may be smaller then all other groups -> extra_rows
+	if (extra_rows > 0) {
+		num_groups++;
+	}
+
+	long group_size = 1<<blocks_per_group;
+	int dwords_per_block = block_size / sizeof(__m128i);
+
+
+	// allocate memory for the current group
+	char *raw_precomputation_buffer = (char*) calloc(
+		1, block_size*group_size*num_groups + sizeof(__m128i));
+
+	if (raw_precomputation_buffer == NULL) {
+		// not enough memory
+		printf("Could not allocate memory for precmputation. %d MBytes needed.\n", block_size * group_size * num_groups / (1024*1024));
+		return NULL;
+	}
+
+	// align it
+	__m128i* precomputation_buffer = (__m128i *) dword_align(
+		raw_precomputation_buffer);
+
+	char* datastore_current_group = datastorebase;
+	char* current_group = (char*)precomputation_buffer;
+
+	for(long group = 0; group < num_groups; group++) {
+		//printf("group %d\n", group);
+		unsigned int group_element;
+
+		unsigned int last_graycode = 0;
+		unsigned int graycode = 0;
+		unsigned int gray_diff = 0;
+
+		if (group == num_groups-1 && extra_rows != 0) {
+			blocks_per_group = extra_rows;
+			group_size = 1<<blocks_per_group;
+		}
+
+		// TODO: allocating memory for the first element of the group is not
+		//       nesscessary since it will only contain zeros (could save 1/16 of
+		//       the allocated memory)
+		for (group_element = 1; group_element<group_size; group_element++) {
+			last_graycode = graycode;
+			graycode = (group_element ^ (group_element>>1));
+			gray_diff = graycode ^ last_graycode;
+
+			// offset = (n-1) - log_2(gray_diff)
+			// the offset determines the element we would like to XOR. Since the
+			// bit_strings are read from left to right, we have to invert
+			// log_2(gray_diff)
+			long long offset = blocks_per_group-1;
+			for(int i = 1; i < (1<<blocks_per_group); i = i << 1) {
+				if (i == gray_diff) break;
+				offset--;
+			}
+
+			// copy the data from the last iteration
+			memcpy(current_group + graycode * block_size,
+				     current_group + last_graycode * block_size, block_size);
+
+			// XOR the block represented by the change in the graycode
+			XOR_fullblocks((__m128i *) (current_group + graycode * block_size),
+									   (__m128i *) (datastore_current_group + offset*block_size),
+										 dwords_per_block);
+
+			// group element done
+		}
+
+		datastore_current_group += blocks_per_group * block_size;
+		current_group += group_size * block_size;
+
+		// group done
+	}
+
+	// TODO: the original datastore won't be needed any more and could be deleted
+	//       to reduce memory consumption since all relevant data is stored in the
+	//       precomputation buffer
+
+	return precomputation_buffer;
+}
+
+
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
-static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, unsigned int numstrings, __m128i *resultbuffer) {
+static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, unsigned int numstrings, __m128i *resultbuffer, char use_precomputed_data) {
 	long one_bit_string_length = bit_string_length / numstrings; // length of one bit string
 	long remaininglength = one_bit_string_length * 8; // convert bytes to bits
+
+	if (remaininglength > xordatastoretable[ds].numberofblocks){
+		remaininglength = xordatastoretable[ds].numberofblocks;
+	}
+
 	char *current_bit_string_pos;
 	current_bit_string_pos = bit_string;
 	long long offset = 0;
@@ -129,23 +222,104 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 	int dwords_per_block = block_size / sizeof(__m128i);
 
-	unsigned char bit = 128;
-	unsigned int i;
+	long num_blocks = xordatastoretable[ds].numberofblocks;
 
-	while (remaininglength > 0) {
 
-		for(i = 0; i < numstrings; i++){
-			if ( *(current_bit_string_pos + one_bit_string_length * i) & bit) {
-				XOR_fullblocks(resultbuffer + dwords_per_block * i, (__m128i *) (datastorebase + offset), dwords_per_block);
+	if (use_precomputed_data == 1) {
+		long blocks_per_group = 4; // do not change!
+		// blocks_per_group is set to a constant number (4) to keep the memory
+		// requirements at a manageable level
+
+		__m128i* groups = xordatastoretable[ds].groups;
+
+		if (groups == NULL) {
+			printf("Error: xordatastoretable[ds].groups is NULL\n");
+			return;
+		}
+
+		long group_size = 1<<blocks_per_group;
+		int bytes_per_group = block_size * group_size;
+
+		long num_groups = num_blocks/blocks_per_group;
+		long extra_rows = num_blocks%blocks_per_group;
+		// the last group may be smaller then all other groups
+
+		char* current_group = (char*) groups;
+		for(long group = 0; group < num_groups; group++) {
+			for(int i = 0; i < numstrings; i++) {
+				// this requires blocks_per_group to be 4
+				unsigned char current_bitstring_byte =
+					*(current_bit_string_pos + one_bit_string_length * i);
+
+				if (group % 2 == 0) {
+					offset = ((current_bitstring_byte & 0xf0)>>4);
+
+					if (offset != 0) {
+						XOR_fullblocks(resultbuffer + dwords_per_block * i,
+												   (__m128i *) (current_group + offset * block_size),
+													 dwords_per_block);
+					}
+				} else {
+					offset = (current_bitstring_byte & 0x0f);
+					if (offset != 0) {
+						XOR_fullblocks(resultbuffer + dwords_per_block * i,
+												   (__m128i *) (current_group + offset * block_size),
+													 dwords_per_block);
+					}
+				}
+			}
+			if (group % 2 == 1) current_bit_string_pos++;
+			current_group += bytes_per_group;
+		}
+
+		if (extra_rows > 0) {
+			long group = num_groups;
+			for(int i = 0; i < numstrings; i++) {
+				// this requires blocks_per_group to be 4
+				unsigned char current_bitstring_byte =
+					*(current_bit_string_pos + one_bit_string_length * i);
+
+				if (group % 2 == 0) {
+					offset = ((current_bitstring_byte & 0xf0)>>4);
+
+					if (offset != 0 && offset < (1<<extra_rows)) {
+						XOR_fullblocks(resultbuffer + dwords_per_block * i,
+													 (__m128i *) (current_group + offset * block_size),
+													 dwords_per_block);
+					}
+				} else {
+					offset = (current_bitstring_byte & 0x0f);
+					if (offset != 0 && offset < (1<<extra_rows)) {
+						XOR_fullblocks(resultbuffer + dwords_per_block * i,
+													 (__m128i *) (current_group + offset * block_size),
+													 dwords_per_block);
+					}
+				}
 			}
 		}
 
-		offset += block_size;
-		bit /= 2;
-		remaininglength -=1;
-		if (bit == 0) {
-			bit = 128;
-			current_bit_string_pos++;
+
+	} else {
+		unsigned char bit = 128;
+		unsigned int i;
+
+		// let's iterate over all bits of the bit_string
+		// each bit of the bit_string represents one PIR block
+		while (remaininglength > 0) {
+
+			for(i = 0; i < numstrings; i++){
+				if ( *(current_bit_string_pos + one_bit_string_length * i) & bit) {
+					XOR_fullblocks(resultbuffer + dwords_per_block * i, (__m128i *) (datastorebase + offset), dwords_per_block);
+				}
+			}
+
+			offset += block_size;
+			bit /= 2;
+			remaininglength -=1;
+			if (bit == 0) {
+				bit = 128;
+				current_bit_string_pos++;
+			}
 		}
 	}
 }
@@ -154,8 +328,12 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
-static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, __m128i *resultbuffer) {
+static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, __m128i *resultbuffer, char use_precomputed_data) {
 	long remaininglength = bit_string_length * 8;  // convert bytes to bits
+
+	if (remaininglength > xordatastoretable[ds].numberofblocks){
+		remaininglength = xordatastoretable[ds].numberofblocks;
+	}
 	char *current_bit_string_pos;
 	current_bit_string_pos = bit_string;
 	long long offset = 0;
@@ -165,21 +343,85 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 
 	int dwords_per_block = block_size / sizeof(__m128i);
 
-	unsigned char bit = 128;
+	long num_blocks = xordatastoretable[ds].numberofblocks;
 
-	while (remaininglength > 0) {
-		if ((*current_bit_string_pos) & bit) {
-			XOR_fullblocks(resultbuffer, (__m128i *) (datastorebase + offset), dwords_per_block);
+	if (use_precomputed_data == 1) {
+		long blocks_per_group = 4; // do not change!
+		// blocks_per_group is set to a constant number (4) to keep the memory
+		// requirements at a manageable level
+
+		__m128i* groups = xordatastoretable[ds].groups;
+
+		if (groups == NULL) {
+			printf("Error: xordatastoretable[ds].groups is NULL\n");
+			return;
 		}
-		offset += block_size;
-		bit /= 2;
-		remaininglength -=1;
-		if (bit == 0) {
-			bit = 128;
-			current_bit_string_pos++;
+
+		long group_size = 1<<blocks_per_group;
+		int bytes_per_group = block_size * group_size;
+
+		long num_groups = num_blocks/blocks_per_group;
+		long extra_rows = num_blocks%blocks_per_group;
+		// the last group may be smaller then all other groups
+
+		if (extra_rows > 0) {
+			num_groups++;
+		}
+
+		unsigned char current_bitstring_byte = *(current_bit_string_pos);
+		char* current_group = (char*) groups;
+
+		for(long group = 0; group < num_groups; group++) {
+			// this requires blocks_per_group to be 4
+
+			if (group % 2 == 0) {
+				offset = ((current_bitstring_byte & 0xf0)>>4);
+				if (offset != 0) {
+					XOR_fullblocks(resultbuffer,
+											   (__m128i *) (current_group + offset * block_size),
+												 dwords_per_block);
+			  }
+			} else {
+				offset = (current_bitstring_byte & 0x0f);
+				if (offset != 0) {
+					XOR_fullblocks(resultbuffer,
+											   (__m128i *) (current_group + offset * block_size),
+												 dwords_per_block);
+				}
+			}
+			if (group % 2 == 1) {
+				current_bit_string_pos++;
+				current_bitstring_byte = *(current_bit_string_pos);
+			}
+			current_group += bytes_per_group;
+		}
+
+
+	} else {
+
+		unsigned char bit = 128;
+
+		// let's iterate over all bits of the bit_string
+		while (remaininglength > 0) {
+			// each bit of the bit_string represents one PIR block
+			// if the bit is set, we XOR the block
+			if ((*current_bit_string_pos) & bit) {
+				XOR_fullblocks(resultbuffer, (__m128i *) (datastorebase + offset), dwords_per_block);
+			}
+			offset += block_size;
+			bit /= 2;
+			remaininglength -=1;
+			if (bit == 0) {
+				bit = 128;
+				current_bit_string_pos++;
+			}
 		}
 	}
 }
+
+
+
+
 
 
 // Does XORs given a bit string. This is the common case and so should be optimized.
@@ -191,8 +433,10 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
 	__m128i *resultbuffer;
+	char use_precomputed_data;
 
-	if (!PyArg_ParseTuple(args, "is#", &ds, &bitstringbuffer, &bitstringlength)) {
+
+	if (!PyArg_ParseTuple(args, "is#b", &ds, &bitstringbuffer, &bitstringlength, &use_precomputed_data)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -210,7 +454,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	resultbuffer = (__m128i *) dword_align(raw_resultbuffer);
 
 	// Let's actually calculate this!
-	bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, resultbuffer);
+	bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, resultbuffer, use_precomputed_data);
 
 	// okay, let's put it in a buffer
 	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
@@ -232,9 +476,9 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
 	__m128i *resultbuffer;
+	char use_precomputed_data;
 
-
-	if (!PyArg_ParseTuple(args, "is#I", &ds, &bitstringbuffer, &bitstringlength, &numstrings)) {
+	if (!PyArg_ParseTuple(args, "is#Ib", &ds, &bitstringbuffer, &bitstringlength, &numstrings, &use_precomputed_data)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -253,7 +497,7 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	resultbuffer = (__m128i *) dword_align(raw_resultbuffer);
 
 	// Let's actually calculate this!
-	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer);
+	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer, use_precomputed_data);
 
 	// okay, let's put it in a buffer
 	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
@@ -282,6 +526,7 @@ static PyObject *SetData(PyObject *module, PyObject *args) {
 
 	// Is the ds valid?
 	if (!is_table_entry_used(ds)) {
+		printf("ds: %i\n", ds);
 		PyErr_SetString(PyExc_ValueError, "Bad index for SetData");
 		return NULL;
 	}
@@ -343,6 +588,7 @@ static void deallocate(datastore_descriptor ds){
 		xordatastoretable[ds].sizeofablock = 0;
 		xordatastoretable[ds].raw_datastore = NULL;
 		xordatastoretable[ds].datastore = NULL;
+		// TODO: free raw_precomputation_buffer
 	}
 }
 
@@ -360,6 +606,36 @@ static PyObject *Deallocate(PyObject *module, PyObject *args) {
 
 	return Py_BuildValue("");
 }
+
+
+// Python wrapper...
+static PyObject *DoPreprocessing(PyObject *module, PyObject *args) {
+	datastore_descriptor ds;
+
+	if (!PyArg_ParseTuple(args, "i", &ds)) {
+		// Incorrect args...
+		return NULL;
+	}
+
+	// Is the ds valid?
+	if (!is_table_entry_used(ds)) {
+		PyErr_SetString(PyExc_ValueError, "Bad index for Produce_Xor_From_Bitstring");
+		return NULL;
+	}
+
+	long num_blocks = xordatastoretable[ds].numberofblocks;
+	int block_size = xordatastoretable[ds].sizeofablock;
+
+	long blocks_per_group = 4; // do not change!
+
+	char *datastorebase;
+	datastorebase = (char *) xordatastoretable[ds].datastore;
+
+	xordatastoretable[ds].groups = do_preprocessing(num_blocks, block_size, blocks_per_group, datastorebase);
+
+	return Py_BuildValue("");
+}
+
 
 
 // I just have this around for testing
@@ -457,6 +733,7 @@ static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 	{"Deallocate", Deallocate, METH_VARARGS, "Deallocate a datastore."},
 	{"GetData", GetData, METH_VARARGS, "Reads data out of a datastore."},
 	{"SetData", SetData, METH_VARARGS, "Puts data into the datastore."},
+	{"DoPreprocessing", DoPreprocessing, METH_VARARGS, "Preprocesses the data."},
 	{"Produce_Xor_From_Bitstring", Produce_Xor_From_Bitstring, METH_VARARGS, "Extract XOR from datastore."},
 	{"Produce_Xor_From_Bitstrings", Produce_Xor_From_Bitstrings, METH_VARARGS, "Extract XORs from datastore."},
 	{"do_xor", do_xor, METH_VARARGS, "does the XOR of two equal length strings."},

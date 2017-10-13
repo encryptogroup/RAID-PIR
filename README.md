@@ -12,7 +12,7 @@ This code is an extension of [upPIR](https://uppir.poly.edu) and large parts of 
 
 Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de) or create an issue here on github.
 
-**Warning:** This code is **not** meant to be used for a productive environment and is intended for testing and demonstration purposes only.
+**Warning:** This code is **not** meant to be used for a productive environment and is intended for testing and demonstrational purposes only.
 
 ### Requirements
 * Python 2.7
@@ -43,9 +43,11 @@ You can also try to link the files to the different directories for easier editi
 
 #### 1.3 Setting up the files to be distributed
 
-Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files/`. Once the files to share are inside this directory you can create a manifest file.
+Now you can copy files over into a directory to be distributed. You can either have a separate directory for each mirror and the vendor (as you would actually have in practice) or share a directory. We'll share a directory called `../files/`. Once the files to share are inside this directory you can create a manifest file. You may use the option `-o eqdist` to enable uniform distribution of the data entries throughout the database.
 
-Command: `python raidpir_create_manifest.py <DIR> <BLOCKSIZE> <VENDOR-IP>`
+Command:
+`python raidpir_create_manifest.py <DIR> <BLOCKSIZE> <VENDOR-IP>`
+`python raidpir_create_manifest.py -o eqdist <DIR> <BLOCKSIZE> <VENDOR-IP>`
 
 Example:
 
@@ -88,7 +90,7 @@ Command: `python raidpir_mirror.py --ip <MIRROR-IP> --port <MIRROR-PORT> --files
 Example:
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/mirror1$ python raidpir_mirror.py --ip 127.0.0.1 --port 62001 --files ../files/ --retrievemanifestfrom 127.0.0.1
+dd@deb:~/workspace/RAID-PIR/test/mirror1$ python raidpir_mirror.py --ip 127.0.0.1 --port 62001 --files ../files/ --retrievemanifestfrom 127.0.0.1 --precompute
 RAID-PIR mirror v0.9.2
 Mirror Server started at 127.0.0.1 : 62001
 ```
@@ -96,7 +98,7 @@ Mirror Server started at 127.0.0.1 : 62001
 We can run another mirror instance in a different terminal. You will need to change to another directory and listen on a different port when you're on a single machine.
 
 ```bash
-dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --files ../files/ --retrievemanifestfrom 127.0.0.1
+dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --files ../files/ --retrievemanifestfrom 127.0.0.1 --precompute
 RAID-PIR mirror v0.9.2
 Mirror Server started at 127.0.0.1 : 62002
 ```

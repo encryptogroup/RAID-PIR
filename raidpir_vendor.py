@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 """
 <Author>
 	Daniel Demmler
@@ -58,6 +59,9 @@ import session
 
 # used to get a lock
 import threading
+
+# used to send messages to the mirrors
+import socket
 
 # to handle protocol requests
 import SocketServer
@@ -155,12 +159,45 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 
 		# if it's a request for a XORBLOCK
 		if requeststring == 'GET MANIFEST':
+			print "GET MANIFEST"
+
+			rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+			_global_rawmanifestdata = rawmanifestdata
 
 			session.sendmessage(self.request, _global_rawmanifestdata)
 			_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " manifest request")
 
 			# done!
 			return
+
+		elif requeststring == 'MANIFEST UPDATE':
+			print 'MANIFEST UPDATE'
+
+			rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+			_global_rawmanifestdata = rawmanifestdata
+
+			# get a copy of the mirrorlist
+			mirrorlist = list()
+			_global_mirrorinfolock.acquire()
+			try:
+				for mirror in _global_mirrorinfodict:
+					mirrorlist.append(
+						_global_mirrorinfodict[mirror]['mirrorinfo'])
+			finally:
+				_global_mirrorinfolock.release()
+
+			for mirror in mirrorlist:
+				sock = None
+				try:
+					# Connect to server and send data
+					sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+					sock.connect((mirror['ip'], mirror['port']))
+					session.sendmessage(sock, 'MANIFEST UPDATE')
+				except:
+					print "Could not connect to mirror", mirror
+					pass
+				finally:
+					sock.close()
 
 		elif requeststring == 'GET MIRRORLIST':
 			# let's try to clean up the list.   If we are busy with another attempt

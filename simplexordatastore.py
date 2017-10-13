@@ -109,7 +109,7 @@ def do_xor_old(string_a, string_b):
 class XORDatastore(object):
 	"""
 	<Purpose>
-		Class that has information for an XORdatastore.   This data structure can
+		Class that has information for an XORdatastore. This data structure can
 		quickly XOR blocks of data that it stores.
 
 	<Side Effects>

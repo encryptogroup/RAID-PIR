@@ -51,8 +51,9 @@ class XORDatastore(object):
 	numberofblocks = None
 	sizeofblocks = None
 	dstype = ""
+	use_precomputed_data = 0
 
-	def __init__(self, block_size, num_blocks, dstype, dbname):  # allocate
+	def __init__(self, block_size, num_blocks, dstype, dbname, use_precomputed_data=False):  # allocate
 		"""
 		<Purpose>
 			Allocate a place to store data for efficient XOR.
@@ -62,6 +63,7 @@ class XORDatastore(object):
 									The value must be a multiple of 64
 
 			num_blocks: the number of blocks.   This must be a positive integer
+			use_precomputed_data: Use the precomputed 4R data
 
 		<Exceptions>
 			TypeError is raised if invalid parameters are given.
@@ -86,6 +88,7 @@ class XORDatastore(object):
 
 		self.numberofblocks = num_blocks
 		self.sizeofblocks = block_size #in byte
+		self.use_precomputed_data = int(use_precomputed_data)
 		self.dstype = dstype
 
 		if dstype == "mmap":
@@ -121,7 +124,7 @@ class XORDatastore(object):
 		if len(bitstring) != math.ceil(self.numberofblocks/8.0):
 			raise TypeError("bitstring is not of the correct length")
 
-		return self.dsobj.Produce_Xor_From_Bitstring(self.ds, bitstring)
+		return self.dsobj.Produce_Xor_From_Bitstring(self.ds, bitstring, self.use_precomputed_data)
 
 
 	def produce_xor_from_multiple_bitstrings(self, bitstring, num_strings):
@@ -147,10 +150,10 @@ class XORDatastore(object):
 		if type(bitstring) != str:
 			raise TypeError("bitstring must be a string")
 
-		if len(bitstring) != math.ceil(self.numberofblocks / 8.0) * num_strings :
+		if len(bitstring) != math.ceil(self.numberofblocks / 8.0)*num_strings :
 			raise TypeError("bitstring is not of the correct length")
 
-		return self.dsobj.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings)
+		return self.dsobj.Produce_Xor_From_Bitstrings(self.ds, bitstring, num_strings, self.use_precomputed_data)
 
 
 	def set_data(self, offset, data_to_add):
@@ -221,6 +224,22 @@ class XORDatastore(object):
 
 		return self.dsobj.GetData(self.ds, offset, quantity)
 
+	def finalize(self):
+		"""
+		<Purpose>
+			Does the preprocessing
+
+		<Arguments>
+			None
+
+		<Exceptions>
+			None
+
+		<Returns>
+			None
+
+		"""
+		self.dsobj.DoPreprocessing(self.ds)
 
 	def __del__(self):   # deallocate
 		"""
