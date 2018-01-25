@@ -511,7 +511,7 @@ def parse_options():
 	parser = optparse.OptionParser()
 
 	parser.add_option("", "--ip", dest="ip", type="string", metavar="IP",
-				default=getmyip.getmyip(), help="Listen for clients on the following IP (default is the public facing IP)")
+				default=0, help="Listen for clients on the following IP (default is the public facing IP)")
 
 	parser.add_option("", "--port", dest="port", type="int", metavar="portnum",
 				default=62294, help="Use the following port to serve RAID-PIR clients (default 62294)")
@@ -559,6 +559,10 @@ def parse_options():
 	(_commandlineoptions, remainingargs) = parser.parse_args()
 
 	# check the arguments
+	if _commandlineoptions.ip == "0":
+		# use external ip, if none is specified
+		_commandlineoptions.ip = getmyip.getmyip()
+
 	if _commandlineoptions.port <= 0 or _commandlineoptions.port > 65535:
 		print "Specified port number out of range"
 		sys.exit(1)
