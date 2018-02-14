@@ -33,7 +33,7 @@ Before you start, make sure you checked out the most recent version from github.
 #### 1.1 Fast XOR
 To have fast XOR operations, you'll need to build some C code. To do this you have to run `python setup.py build`.
 
-If you cannot get this to work, you can try editing `raidpirlib.py` and `raidpir_mirror.py` to change `import fastsimplexordatastore` to read `import simplexordatastore as fastsimplexordatastore`.
+If you cannot get this to work, you can edit `raidpir_mirror.py` and change `import fastsimplexordatastore` to `import simplexordatastore as fastsimplexordatastore`.
 
 #### 1.2 Directories
 Normally each party will run on a separate machine. For testing locally on a single machine, copy and paste the files to different directories for each participant:

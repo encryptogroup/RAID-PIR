@@ -46,6 +46,9 @@ import optparse
 # Holds the mirror data and produces the XORed blocks
 import fastsimplexordatastore
 
+# if you cannot build the C datastore uncomment the following line
+#import simplexordatastore as fastsimplexordatastore
+
 # helper functions that are shared
 import raidpirlib as lib
 

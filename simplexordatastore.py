@@ -147,7 +147,7 @@ class XORDatastore(object):
 	numberofblocks = None
 	sizeofblocks = None
 
-	def __init__(self, block_size, num_blocks):  # allocate
+	def __init__(self, block_size, num_blocks, dstype, dbname, use_precomputed_data=False):  # allocate
 		"""
 		<Purpose>
 			Allocate a place to store data for efficient XOR.
