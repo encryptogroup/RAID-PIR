@@ -514,7 +514,7 @@ def parse_options():
 	parser = optparse.OptionParser()
 
 	parser.add_option("", "--ip", dest="ip", type="string", metavar="IP",
-				default=0, help="Listen for clients on the following IP (default is the public facing IP)")
+				default='0', help="Listen for clients on the following IP (default is the public facing IP)")
 
 	parser.add_option("", "--port", dest="port", type="int", metavar="portnum",
 				default=62294, help="Use the following port to serve RAID-PIR clients (default 62294)")
