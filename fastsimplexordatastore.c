@@ -238,7 +238,6 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 		}
 
 		long group_size = 1<<blocks_per_group;
-		int bytes_per_group = block_size * group_size;
 
 		long num_groups = num_blocks/blocks_per_group;
 		long extra_rows = num_blocks%blocks_per_group;
@@ -269,7 +268,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 				}
 			}
 			if (group % 2 == 1) current_bit_string_pos++;
-			current_group += bytes_per_group;
+			current_group += block_size * group_size;
 		}
 
 		if (extra_rows > 0) {
@@ -329,21 +328,14 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 // This function needs to be fast.   It is a good candidate for releasing Python's GIL
 
 static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_length, __m128i *resultbuffer, char use_precomputed_data) {
-	long remaininglength = bit_string_length * 8;  // convert bytes to bits
-
-	if (remaininglength > xordatastoretable[ds].numberofblocks){
-		remaininglength = xordatastoretable[ds].numberofblocks;
-	}
-	char *current_bit_string_pos;
-	current_bit_string_pos = bit_string;
+	char *current_bit_string_pos = bit_string;
 	long long offset = 0;
+
 	int block_size = xordatastoretable[ds].sizeofablock;
-	char *datastorebase;
-	datastorebase = (char *) xordatastoretable[ds].datastore;
+	char *datastorebase = (char *) xordatastoretable[ds].datastore;
+	long num_blocks = xordatastoretable[ds].numberofblocks;
 
 	int dwords_per_block = block_size / sizeof(__m128i);
-
-	long num_blocks = xordatastoretable[ds].numberofblocks;
 
 	if (use_precomputed_data == 1) {
 		long blocks_per_group = 4; // do not change!
@@ -358,8 +350,6 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 		}
 
 		long group_size = 1<<blocks_per_group;
-		int bytes_per_group = block_size * group_size;
-
 		long num_groups = num_blocks/blocks_per_group;
 		long extra_rows = num_blocks%blocks_per_group;
 		// the last group may be smaller then all other groups
@@ -388,16 +378,19 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 											   (__m128i *) (current_group + offset * block_size),
 												 dwords_per_block);
 				}
-			}
-			if (group % 2 == 1) {
 				current_bit_string_pos++;
 				current_bitstring_byte = *(current_bit_string_pos);
 			}
-			current_group += bytes_per_group;
+			current_group += block_size * group_size;
 		}
 
 
 	} else {
+		long remaininglength = bit_string_length * 8;  // convert bytes to bits
+
+		if (remaininglength > xordatastoretable[ds].numberofblocks){
+			remaininglength = xordatastoretable[ds].numberofblocks;
+		}
 
 		unsigned char bit = 128;
 
