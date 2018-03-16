@@ -154,11 +154,6 @@ static inline __m128i* do_preprocessing(long num_blocks, int block_size, long bl
 		unsigned int graycode = 0;
 		unsigned int gray_diff = 0;
 
-		if (group == num_groups-1 && extra_rows != 0) {
-			blocks_per_group = extra_rows;
-			group_size = 1<<blocks_per_group;
-		}
-
 		// TODO: allocating memory for the first element of the group is not
 		//       nesscessary since it will only contain zeros (could save 1/16 of
 		//       the allocated memory)
