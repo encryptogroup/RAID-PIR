@@ -3,6 +3,9 @@
  * Purpose: The fastsimplexordatastore.   A simple, C-based datastore
  */
 
+// see PEP353, required for PyArg_ParseTuple #s
+#define PY_SSIZE_T_CLEAN
+
 #include "Python.h"
 #include "fastsimplexordatastore.h"
 
@@ -135,7 +138,7 @@ static inline __m128i* do_preprocessing(long num_blocks, int block_size, long bl
 
 	if (raw_precomputation_buffer == NULL) {
 		// not enough memory
-		printf("Could not allocate memory for precmputation. %d MBytes needed.\n", block_size * group_size * num_groups / (1024*1024));
+		printf("Could not allocate memory for precomputation. %ld MBytes needed.\n", block_size * group_size * num_groups / (1024*1024));
 		return NULL;
 	}
 
