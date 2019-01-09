@@ -187,6 +187,11 @@ def find_hash(contents, algorithm):
 		hashobj = hashlib.new(hashalgorithmname)
 		hashobj.update(contents)
 
+	if len(contents)>8:
+		print "findhash dbg", len(contents), printhexstr(contents[0:4]), "...", printhexstr(contents[-4:]), hashobj.hexdigest()
+	else:
+		print "findhash dbg", len(contents), printhexstr(contents), hashobj.hexdigest()
+
 	if hashencoding == 'raw':
 		return hashobj.digest()
 	elif hashencoding == 'hex':
@@ -330,7 +335,7 @@ def request_xorblock_chunked_rng_parallel(socket, chunks):
 	session.sendmessage(socket, "M" + msgpack.packb(chunks))
 
 
-def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=8901):
+def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
 	"""
 	<Purpose>
 		Retrieves the mirrorinfolist from a vendor.
@@ -1302,3 +1307,6 @@ def nextrandombitsAES(cipher, bitlength):
 	else:
 		pt = bytelength * "\0"
 		return cipher.encrypt(pt)
+
+def printhexstr(s):
+	return ''.join(x.encode('hex') for x in s)

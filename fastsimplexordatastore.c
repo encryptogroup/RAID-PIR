@@ -3,9 +3,6 @@
  * Purpose: The fastsimplexordatastore.   A simple, C-based datastore
  */
 
-// see PEP353, required for PyArg_ParseTuple #s
-#define PY_SSIZE_T_CLEAN
-
 #include "Python.h"
 #include "fastsimplexordatastore.h"
 
@@ -170,8 +167,10 @@ static inline __m128i* do_preprocessing(long num_blocks, int block_size, long bl
 			// bit_strings are read from left to right, we have to invert
 			// log_2(gray_diff)
 			long long offset = blocks_per_group-1;
-			for(int i = 1; i < (1<<blocks_per_group); i = i << 1) {
-				if (i == gray_diff) break;
+			for(unsigned int i = 1; i < ( (unsigned int) 1<<blocks_per_group); i = i << 1) {
+				if (i == gray_diff){
+					break;
+				}
 				offset--;
 			}
 
@@ -243,7 +242,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 		char* current_group = (char*) groups;
 		for(long group = 0; group < num_groups; group++) {
-			for(int i = 0; i < numstrings; i++) {
+			for(unsigned int i = 0; i < numstrings; i++) {
 				// this requires blocks_per_group to be 4
 				unsigned char current_bitstring_byte =
 					*(current_bit_string_pos + one_bit_string_length * i);
@@ -271,7 +270,7 @@ static void multi_bitstring_xor_worker(int ds, char *bit_string, long bit_string
 
 		if (extra_rows > 0) {
 			long group = num_groups;
-			for(int i = 0; i < numstrings; i++) {
+			for(unsigned int i = 0; i < numstrings; i++) {
 				// this requires blocks_per_group to be 4
 				unsigned char current_bitstring_byte =
 					*(current_bit_string_pos + one_bit_string_length * i);
