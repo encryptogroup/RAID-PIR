@@ -31,13 +31,13 @@ try:
 	# for packing more complicated messages
 	import msgpack
 except ImportError:
-	print "Requires MsgPack module (http://msgpack.org/)"
+	print("Requires MsgPack module (http://msgpack.org/)")
 	sys.exit(1)
 
 # Check the python version.   It's pretty crappy to do this from a library,
 # but it's an easy way to check this universally
-if sys.version_info[0] != 2 or sys.version_info[1] != 7:
-	print "Requires Python 2.7"
+if sys.version_info[0] != 3 or sys.version_info[1] < 5:
+	print("Requires Python >= 3.5")
 	sys.exit(1)
 
 import hashlib
@@ -46,9 +46,9 @@ from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
 import time
-_timer = time.time
+_timer = time.perf_counter
 
-pirversion = "v0.9.4"
+pirversion = "v0.9.5"
 
 # Exceptions...
 class FileNotFound(Exception):
@@ -71,12 +71,12 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 
 	# skip hash calculation if that is desired
 	if hashalgorithm == 'noop' or hashalgorithm == 'none' or hashalgorithm == None:
-		for _ in xrange(blockcount):
+		for _ in range(blockcount):
 			currenthashlist.append('')
 		return currenthashlist
 
 	# Now I'll check the blocks have the right hash...
-	for blocknum in xrange(blockcount):
+	for blocknum in range(blockcount):
 		# read the block ...
 		thisblock = xordatastore.get_data(blocksize * blocknum, blocksize)
 		# ... and check its hash
@@ -89,7 +89,7 @@ def _compute_block_hashlist_fromdatastore(xordatastore, blockcount, blocksize, h
 def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgorithm):
 	"""private helper, used both the compute and check hashes"""
 
-	print "[INFO] Calculating block hashes with algorithm", hashalgorithm, "..."
+	print("[INFO] Calculating block hashes with algorithm", hashalgorithm, "...")
 
 	if hashalgorithm in ['noop', 'none', None]:
 		currenthashlist = ['']*blockcount
@@ -97,22 +97,22 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 
 	currenthashlist = []
 	lastoffset = 0
-	thisblock = ""
-	pt = blockcount / 20
+	thisblock = b''
+	pt = int(blockcount / 20)
 	nextprint = pt
 
-	for blocknum in xrange(blockcount):
+	for blocknum in range(blockcount):
 
 		if blockcount > 99 and blocknum >= nextprint:
-			print blocknum, "/", blockcount,\
-				  "("+str(int(round(blocknum*1.0/blockcount*100)))+"%) done..."
+			print(blocknum, "/", blockcount,\
+				  "("+str(int(round(blocknum*1.0/blockcount*100)))+"%) done...")
 			nextprint = nextprint + pt
 
 		while len(thisblock) < blocksize:
 
 			if lastoffset in offsetdict:
-				fd = open(offsetdict[lastoffset])
-				print "[INFO] reading", offsetdict[lastoffset]
+				fd = open(offsetdict[lastoffset], 'rb')
+				print("[INFO] reading", offsetdict[lastoffset])
 
 				thisfilecontents = fd.read()
 				fd.close()
@@ -123,14 +123,14 @@ def _compute_block_hashlist_fromdisk(offsetdict, blockcount, blocksize, hashalgo
 				del fd
 				del thisfilecontents
 			else:
-				thisblock = thisblock + blocksize * "\0"
+				thisblock = thisblock + blocksize * b'\0'
 
 		# ... and check its hash
 		currenthashlist.append(find_hash(thisblock[:blocksize], hashalgorithm))
 
 		thisblock = thisblock[blocksize:]
 
-	print "[INFO] All blocks done."
+	print("[INFO] All blocks done.")
 	return currenthashlist
 
 
@@ -187,11 +187,6 @@ def find_hash(contents, algorithm):
 		hashobj = hashlib.new(hashalgorithmname)
 		hashobj.update(contents)
 
-	if len(contents)>8:
-		print "findhash dbg", len(contents), printhexstr(contents[0:4]), "...", printhexstr(contents[-4:]), hashobj.hexdigest()
-	else:
-		print "findhash dbg", len(contents), printhexstr(contents), hashobj.hexdigest()
-
 	if hashencoding == 'raw':
 		return hashobj.digest()
 	elif hashencoding == 'hex':
@@ -227,10 +222,9 @@ def transmit_mirrorinfo(mirrorinfo, vendorlocation, defaultvendorport=62293):
 		raise TypeError("Mirror information must be a dictionary")
 
 	# do the actual communication...
-	answer = _remote_query_helper(vendorlocation, "MIRRORADVERTISE" + msgpack.packb(mirrorinfo), defaultvendorport)
+	answer = _remote_query_helper(vendorlocation, b"MIRRORADVERTISE" + msgpack.packb(mirrorinfo, use_bin_type=True), defaultvendorport)
 
-	if answer != "OK":
-		# JAC: I don't really like using ValueError. I should define a new one
+	if answer != b"OK":
 		raise ValueError(answer)
 
 
@@ -257,7 +251,7 @@ def retrieve_rawmanifest(vendorlocation, defaultvendorport=62293):
 		A string containing the manifest data (unprocessed).   It is a good idea
 		to use parse_manifest to ensure this data is correct.
 	"""
-	return _remote_query_helper(vendorlocation, "GET MANIFEST", defaultvendorport)
+	return _remote_query_helper(vendorlocation, b"GET MANIFEST", defaultvendorport)
 
 def retrieve_xorblock(socket, bitstring):
 
@@ -283,7 +277,7 @@ def retrieve_xorblock(socket, bitstring):
 		Binary data of size of 1 block. Several blocks XORed together.
 	"""
 
-	response = _remote_query_helper_sock(socket, "X" + bitstring)
+	response = _remote_query_helper_sock(socket, b"X" + bitstring)
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -291,11 +285,11 @@ def retrieve_xorblock(socket, bitstring):
 
 # only request a xorblock, without receiving it
 def request_xorblock(socket, bitstring):
-	session.sendmessage(socket, "X" + bitstring)
+	session.sendmessage(socket, b"X" + bitstring)
 
 
 def retrieve_xorblock_chunked(socket, chunks):
-	response = _remote_query_helper_sock(socket, "C" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, b"C" + msgpack.packb(chunks, use_bin_type=True))
 
 	if response == 'Invalid request length':
 		raise ValueError(response)
@@ -305,11 +299,11 @@ def retrieve_xorblock_chunked(socket, chunks):
 
 # only request a xorblock, without receiving it
 def request_xorblock_chunked(socket, chunks):
-	session.sendmessage(socket, "C" + msgpack.packb(chunks))
+	session.sendmessage(socket, b"C" + msgpack.packb(chunks, use_bin_type=True))
 
 
 def retrieve_xorblock_chunked_rng(socket, chunks):
-	response = _remote_query_helper_sock(socket, "R" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, b"R" + msgpack.packb(chunks, use_bin_type=True))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -318,11 +312,11 @@ def retrieve_xorblock_chunked_rng(socket, chunks):
 
 # only request a xorblock, without receiving it
 def request_xorblock_chunked_rng(socket, chunks):
-	session.sendmessage(socket, "R" + msgpack.packb(chunks))
+	session.sendmessage(socket, b"R" + msgpack.packb(chunks, use_bin_type=True))
 
 
 def retrieve_xorblock_chunked_rng_parallel(socket, chunks):
-	response = _remote_query_helper_sock(socket, "M" + msgpack.packb(chunks))
+	response = _remote_query_helper_sock(socket, b"M" + msgpack.packb(chunks, use_bin_type=True))
 	if response == 'Invalid request length':
 		raise ValueError(response)
 
@@ -332,7 +326,7 @@ def retrieve_xorblock_chunked_rng_parallel(socket, chunks):
 
 # only request a xorblock, without receiving it
 def request_xorblock_chunked_rng_parallel(socket, chunks):
-	session.sendmessage(socket, "M" + msgpack.packb(chunks))
+	session.sendmessage(socket, b"M" + msgpack.packb(chunks, use_bin_type=True))
 
 
 def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
@@ -361,9 +355,9 @@ def retrieve_mirrorinfolist(vendorlocation, defaultvendorport=62293):
 	<Returns>
 		A list of mirror information dictionaries.
 	"""
-	rawmirrordata = _remote_query_helper(vendorlocation, "GET MIRRORLIST", defaultvendorport)
+	rawmirrordata = _remote_query_helper(vendorlocation, b"GET MIRRORLIST", defaultvendorport)
 
-	mirrorinfolist = msgpack.unpackb(rawmirrordata)
+	mirrorinfolist = msgpack.unpackb(rawmirrordata, raw=False)
 
 	# the mirrorinfolist must be a list (duh)
 	if type(mirrorinfolist) != list:
@@ -392,7 +386,7 @@ def _remote_query_helper(serverlocation, command, defaultserverport):
 	# private function that contains the guts of server communication.   It
 	# issues a single query and then closes the connection.   This is used
 	# both to talk to the vendor and also to talk to mirrors
-	if type(serverlocation) != str and type(serverlocation) != unicode:
+	if type(serverlocation) != str and type(serverlocation) != str:
 		raise TypeError("Server location must be a string, not " + str(type(serverlocation)))
 
 	# now let's split it and ensure there are 0 or 1 colons
@@ -450,10 +444,10 @@ def parse_manifest(rawmanifestdata):
 		A dictionary containing the manifest.
 	"""
 
-	if type(rawmanifestdata) != str:
-		raise TypeError("Raw manifest data must be a string")
+	if type(rawmanifestdata) != bytes:
+		raise TypeError("Raw manifest data must be bytes")
 
-	manifestdict = msgpack.unpackb(rawmanifestdata)
+	manifestdict = msgpack.unpackb(rawmanifestdata, raw=False)
 
 	_validate_manifest(manifestdict)
 
@@ -494,14 +488,13 @@ def populate_xordatastore(manifestdict, xordatastore, datasource, dstype,
 	if type(manifestdict) != dict:
 		raise TypeError("Manifest dict must be a dictionary")
 
-	if type(datasource) != str and type(datasource) != unicode:
+	if type(datasource) != str and type(datasource) != str:
 		raise TypeError("Mirror root must be a string")
 
 	if dstype == "mmap":
 		_mmap_database(xordatastore, datasource)
 	else: # RAM
 		_add_data_to_datastore(xordatastore, manifestdict['fileinfolist'], datasource, manifestdict['hashalgorithm'], manifestdict['datastore_layout'], manifestdict['blocksize'])
-
 
 	hashlist = _compute_block_hashlist_fromdatastore(xordatastore, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
 
@@ -513,10 +506,10 @@ def populate_xordatastore(manifestdict, xordatastore, datasource, dstype,
 
 	if precompute:
 		print("Preprocessing data...")
-		start = time.clock()
+		start = _timer()
 		xordatastore.finalize()
-		elapsed = (time.clock() - start)
-		print "Preprocessing done. Took %f seconds." % elapsed
+		elapsed = (_timer() - start)
+		print("Preprocessing done. Took %f seconds." % elapsed)
 
 
 def _mmap_database(xordatastore, dbname):
@@ -542,12 +535,11 @@ def _add_data_to_datastore(xordatastore, fileinfolist, rootdir, hashalgorithm, d
 			raise FileNotFound("File '" + thisrelativefilename + "' listed in manifest cannot be found in manifest root: '" + rootdir + "'.")
 
 		# can't go above the root!
-		# JAC: I would use relpath, but it's 2.6 and on
 		if not os.path.normpath(os.path.abspath(thisfilename)).startswith(os.path.abspath(rootdir)):
 			raise TypeError("File in manifest cannot go back from the root dir!!!")
 
 		# get the relevant data
-		thisfilecontents = open(thisfilename).read()
+		thisfilecontents = open(thisfilename, 'rb').read()
 
 		# let's see if this has the right size
 		if len(thisfilecontents) != thisfilelength:
@@ -599,7 +591,7 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 			raise TypeError("File in manifest cannot go back from the root dir!!!")
 
 		# get the relevant data
-		fd = open(thisfilename)
+		fd = open(thisfilename, 'rb')
 		thisfilecontents = fd.read()
 
 		# let's see if this has the right size
@@ -617,7 +609,7 @@ def _create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm):
 		# and add it to the dict
 		offsetdict[thisoffset] = thisfilename
 
-	print "[INFO] Offset-Dict generated."
+	print("[INFO] Offset-Dict generated.")
 
 
 def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgorithm):
@@ -643,7 +635,7 @@ def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgor
 		None
 	"""
 
-	print "[INFO] Using `nogaps` algorithm."
+	print("[INFO] Using `nogaps` algorithm.")
 
 	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
 	# We also don't use the rootdir.   I think this is typical
@@ -682,7 +674,7 @@ def datastore_layout_function_nogaps(fileinfolist, rootdir, blocksize, hashalgor
 
 	offsetdict = {}
 	_create_offset_dict(offsetdict, fileinfolist, rootdir, hashalgorithm)
-	print "[INFO] Indexing done ..."
+	print("[INFO] Indexing done ...")
 
 	# and it is time to get the blockhashlist...
 	# manifestdict['blockhashlist'] = _compute_block_hashlist(offsetdict, manifestdict['blockcount'], manifestdict['blocksize'], manifestdict['hashalgorithm'])
@@ -714,7 +706,7 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 		None
 	"""
 
-	print "[INFO] Using `eqdist` algorithm."
+	print("[INFO] Using `eqdist` algorithm.")
 
 	# Note, this algorithm doesn't use the blocksize.   Most of algorithms will.
 	# We also don't use the rootdir.   I think this is typical
@@ -725,7 +717,7 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 
 	blockcount = int(math.ceil(db_length * 1.0 / blocksize))
 
-	free_blocks = range(1, blockcount)
+	free_blocks = list(range(1, blockcount))
 	currentoffset = 0
 	currentblock = 0
 	last_block = -1
@@ -737,21 +729,21 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 
 	# define the hashlist for the block hashes
 	hashlist = ['']*blockcount
-	current_block_content = ""
+	current_block_content = b''
 
 
 	for thisfileinfo in fileinfolist:
 		thisfileinfo['offsets'] = []
 
 		thisfilename = os.path.join(rootdir, thisfileinfo['filename'])
-		print "[INFO] reading", thisfilename
+		print("[INFO] reading", thisfilename)
 
 		# prevent access above rootdir
 		if not os.path.normpath(os.path.abspath(thisfilename)).startswith(os.path.abspath(rootdir)):
 			raise TypeError("File in manifest cannot go back from the root dir!!!")
 
 		# open the file for reading (to compute the hash for the current block)
-		fd = open(thisfilename)
+		fd = open(thisfilename, 'rb')
 
 		remainingbytes = thisfileinfo['length']
 		blocks_per_file = thisfileinfo['length']*1.0 / blocksize
@@ -769,19 +761,19 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 
 			if currentoffset % blocksize == 0 and len(free_blocks) != 0:
 				# block is full
-				last_block = currentoffset/blocksize - 1
+				last_block = int(currentoffset/blocksize) - 1
 
 				# show progress
 				hashedblocks += 1
 				if blockcount > 99 and hashedblocks >= nextprint:
-					print hashedblocks, "/", blockcount,\
-						  "("+str(int(round(hashedblocks*1.0/blockcount*100)))+"%) done..."
+					print(hashedblocks, "/", blockcount,\
+						  "("+str(int(round(hashedblocks*1.0/blockcount*100)))+"%) done...")
 					nextprint = nextprint + pt
 
 
 				# calculate hash for block
 				hashlist[last_block] = find_hash(current_block_content, hashalgorithm)
-				current_block_content = ""
+				current_block_content = b''
 
 				# find new free block
 				current_step += 1
@@ -806,10 +798,10 @@ def datastore_layout_function_eqdist(fileinfolist, rootdir, blocksize, hashalgor
 
 	# the last block has to be padded to full block size
 	block_remaining_bytes = (blocksize - (currentoffset % blocksize))
-	current_block_content += block_remaining_bytes * "\0"
+	current_block_content += block_remaining_bytes * b'\0'
 
 	# calculate the hash for the last block
-	current_block = currentoffset/blocksize
+	current_block = int(currentoffset/blocksize)
 	hashlist[current_block] = find_hash(current_block_content, hashalgorithm)
 
 	for h in hashlist:
@@ -827,7 +819,7 @@ def _find_blockloc_from_offset(offset, sizeofblocks):
 	# Private helper function that translates an offset into (block, offset)
 	assert offset >= 0
 
-	return (offset / sizeofblocks, offset % sizeofblocks)
+	return (int(offset / sizeofblocks), offset % sizeofblocks)
 
 
 def extract_file_from_blockdict(filename, manifestdict, blockdict):
@@ -931,12 +923,12 @@ def get_blocklist_for_file(filename, manifestdict):
 				# it's the starting offset / blocksize until the
 				# ending offset -1 divided by the blocksize
 				# I do + 1 because range will otherwise omit the last block
-				return range(fileinfo['offset'] / blocksize, (fileinfo['offset'] + fileinfo['length'] - 1) / blocksize + 1)
+				return range(int(fileinfo['offset'] / blocksize), int((fileinfo['offset'] + fileinfo['length'] - 1) / blocksize + 1))
 			elif manifestdict['datastore_layout'] == 'eqdist':
 				offsets = fileinfo['offsets']
 				blocks = []
 				for offset in offsets:
-					blocks.append(offset/blocksize)
+					blocks.append(int(offset/blocksize))
 				return blocks
 			else:
 				raise Exception("Unknown datastore layout")
@@ -987,7 +979,7 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-raw"):
 			thisfiledict['length'] = os.path.getsize(fullfilename)
 
 			# get the hash
-			fd = open(fullfilename)
+			fd = open(fullfilename, 'rb')
 			filecontents = fd.read()
 			thisfiledict['hash'] = find_hash(filecontents, hashalgorithm)
 
@@ -997,17 +989,17 @@ def _generate_fileinfolist(startdirectory, hashalgorithm="sha256-raw"):
 
 			fileinfo_list.append(thisfiledict)
 
-	print "[INFO] Fileinfolist generation done."
+	print("[INFO] Fileinfolist generation done.")
 	return fileinfo_list
 
 
 def _write_db(startdirectory, dbname):
 	"""private helper. Writes all files into a single db file"""
 
-	oo = open(dbname, 'w')
+	oo = open(dbname, 'wb')
 
 	# Header
-	oo.write("RAIDPIRDB_v0.9.3")
+	oo.write(b"RAIDPIRDB_" + pirversion.encode('utf-8'))
 
 	# let's walk through the directories and add the files + sizes
 	for parentdir, junkchilddirectories, filelist in os.walk(startdirectory):
@@ -1027,7 +1019,7 @@ def _write_db(startdirectory, dbname):
 			del filecontents
 			del fd
 
-	print "Database", dbname, "created."
+	print("Database", dbname, "created.")
 	oo.close();
 
 
@@ -1041,19 +1033,19 @@ def set_bitstring_bit(bitstring, bitnum, valuetoset):
 	bytepos = bitnum >> 3
 	bitpos = 7 - (bitnum % 8)
 
-	bytevalue = ord(bitstring[bytepos])
+	bytevalue = bitstring[bytepos]
 	# if setting to 1...
 	if valuetoset:
 		if bytevalue & (2 ** bitpos):
 			# nothing to do, it's set.
 			return bitstring
 		else:
-			return bitstring[:bytepos] + chr(bytevalue + (2 ** bitpos)) + bitstring[bytepos + 1:]
+			return bitstring[:bytepos] + (bytevalue + (2 ** bitpos)).to_bytes(1, byteorder='big') + bitstring[bytepos + 1:]
 
 	else:  # I'm setting it to 0...
 
 		if bytevalue & (2 ** bitpos):
-			return bitstring[:bytepos] + chr(bytevalue - (2 ** bitpos)) + bitstring[bytepos + 1:]
+			return bitstring[:bytepos] + (bytevalue - (2 ** bitpos)).to_bytes(1, byteorder='big') + bitstring[bytepos + 1:]
 		else:
 			# nothing to do, it's not set.
 			return bitstring
@@ -1065,7 +1057,7 @@ def get_bitstring_bit(bitstring, bitnum):
 	bitpos = 7 - (bitnum % 8)
 
 	# we want to return 0 or 1.   I'll AND 2^bitpos and then divide by it
-	return (ord(bitstring[bytepos]) & (2 ** bitpos)) >> bitpos
+	return (bitstring[bytepos] & (2 ** bitpos)) >> bitpos
 
 
 def flip_bitstring_bit(bitstring, bitnum):
@@ -1151,7 +1143,7 @@ def create_manifest(rootdir=".", hashalgorithm="sha256-raw", block_size=1024 * 1
 	elif datastore_layout == "eqdist":
 		manifestdict['blockhashlist'] = datastore_layout_function_eqdist(fileinfolist, rootdir, manifestdict['blocksize'], hashalgorithm)
 	else:
-		print "Unknown datastore layout function. Try 'nogaps' or 'eqdist'"
+		print("Unknown datastore layout function. Try 'nogaps' or 'eqdist'")
 		sys.exit(1)
 
 	manifestdict['fileinfolist'] = fileinfolist
@@ -1179,7 +1171,7 @@ def randombits(bitlength):
 	if bitlength % 8 == 0: additional_bits = 8
 
 	# let's add the additional_bits to the randombytes array
-	randombytes += chr(ord(os.urandom(1)) & ((0xff00 >> additional_bits) & 255))
+	randombytes += (os.urandom(1)[0] & ((0xff00 >> additional_bits) & 0xff)).to_bytes(1, byteorder = 'big')
 	return randombytes
 
 
@@ -1201,8 +1193,8 @@ def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):
 		A random byte-string of supplied bitlength
 	"""
 
-	result = ""
-	chunklen = chunklen / 8
+	result = b''
+	chunklen = int(chunklen / 8)
 	lastchunklen = bits_to_bytes(lastchunklen)
 
 	for i in range(0, k):
@@ -1210,9 +1202,9 @@ def build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen):
 			result = result + chunks[i]
 		else:
 			if i < k - 1:
-				result = result + chunklen * "\0"
+				result = result + chunklen * b'\0'
 			else:
-				result = result + lastchunklen * "\0"
+				result = result + lastchunklen * b'\0'
 
 	return result
 
@@ -1236,22 +1228,22 @@ def build_bitstring_from_chunks_parallel(chunks, k, chunklen, lastchunklen):
 	"""
 
 	result = {}
-	chunklen = chunklen / 8
+	chunklen = int(chunklen / 8)
 	lastchunklen = bits_to_bytes(lastchunklen)
 
 
 	for c in chunks:
-		bitstring = ""
+		bitstring = b''
 
-		for i in xrange(k):
+		for i in range(k):
 
 			if i == c:
 				bitstring = bitstring + chunks[c]
 			else:
 				if i < k - 1:
-					bitstring = bitstring + chunklen * "\0"
+					bitstring = bitstring + chunklen * b'\0'
 				else:
-					bitstring = bitstring + lastchunklen * "\0"
+					bitstring = bitstring + lastchunklen * b'\0'
 
 		result[c] = bitstring
 
@@ -1295,18 +1287,12 @@ def nextrandombitsAES(cipher, bitlength):
 
 	if bitoffset > 0:
 		# if the bitlength is not a multiple of 8, clear the rightmost bits
-		pt = (bytelength - 1) * "\0"
-
+		pt = (bytelength - 1) * b'\0'
 		randombytes = cipher.encrypt(pt)
-		b = ord(cipher.encrypt("\0"))
-		for i in range(8 - bitoffset):
-			b &= ~(1 << i)
-		b = chr(b)
+		b = cipher.encrypt(b'\0')
+		b = (b[0] & ((0xff00 >> bitoffset) & 0xff)).to_bytes(1, byteorder = 'big')
 		randombytes += b
 		return randombytes
 	else:
-		pt = bytelength * "\0"
+		pt = bytelength * b'\0'
 		return cipher.encrypt(pt)
-
-def printhexstr(s):
-	return ''.join(x.encode('hex') for x in s)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 <Author>
 	Daniel Demmler
@@ -6,7 +6,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	December 2014
+	January 2019
 
 <Description>
 	Vendor code for RAID-PIR. The vendor serves the manifest and mirror list.
@@ -43,15 +43,15 @@ import optparse
 import raidpirlib as lib
 
 # Check the python version
-if sys.version_info[0] != 2 or sys.version_info[1] != 7:
-	print "Requires Python 2.7"
+if sys.version_info[0] != 3 or sys.version_info[1] < 5:
+	print("Requires Python >= 3.5")
 	sys.exit(1)
 
 # for unpacking messages
 try:
 	import msgpack
 except ImportError:
-	print "Requires MsgPack module (http://msgpack.org/)"
+	print("Requires MsgPack module (http://msgpack.org/)")
 	sys.exit(1)
 
 # This is used to communicate with clients with a message like abstraction
@@ -64,7 +64,7 @@ import threading
 import socket
 
 # to handle protocol requests
-import SocketServer
+import socketserver
 
 # to run in the background...
 import daemon
@@ -142,12 +142,11 @@ def _add_mirrorinfo_to_list(thismirrorinfo):
 
 ######################### Serve RAID-PIR Vendor requests ########################
 
-# I don't need to change this much, I think...
-class ThreadedVendorServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedVendorServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 	allow_reuse_address = True
 
 
-class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
+class ThreadedVendorRequestHandler(socketserver.BaseRequestHandler):
 
 	def handle(self):
 
@@ -158,10 +157,10 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 		remoteip, remoteport = self.request.getpeername()
 
 		# if it's a request for a XORBLOCK
-		if requeststring == 'GET MANIFEST':
-			print "GET MANIFEST"
+		if requeststring == b'GET MANIFEST':
+			print("GET MANIFEST")
 
-			rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+			rawmanifestdata = open(_commandlineoptions.manifestfilename, 'rb').read()
 			_global_rawmanifestdata = rawmanifestdata
 
 			session.sendmessage(self.request, _global_rawmanifestdata)
@@ -170,10 +169,10 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			# done!
 			return
 
-		elif requeststring == 'MANIFEST UPDATE':
-			print 'MANIFEST UPDATE'
+		elif requeststring == b'MANIFEST UPDATE':
+			print('MANIFEST UPDATE')
 
-			rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+			rawmanifestdata = open(_commandlineoptions.manifestfilename, 'rb').read()
 			_global_rawmanifestdata = rawmanifestdata
 
 			# get a copy of the mirrorlist
@@ -194,12 +193,12 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 					sock.connect((mirror['ip'], mirror['port']))
 					session.sendmessage(sock, 'MANIFEST UPDATE')
 				except:
-					print "Could not connect to mirror", mirror
+					print("Could not connect to mirror", mirror)
 					pass
 				finally:
 					sock.close()
 
-		elif requeststring == 'GET MIRRORLIST':
+		elif requeststring == b'GET MIRRORLIST':
 			# let's try to clean up the list.   If we are busy with another attempt
 			# to do this, the latter will be a NOOP
 			_check_for_expired_mirrorinfo()
@@ -211,12 +210,12 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			# done!
 			return
 
-		elif requeststring.startswith('MIRRORADVERTISE'):
+		elif requeststring.startswith(b'MIRRORADVERTISE'):
 			# This is a mirror telling us it's ready to serve clients.
 
 			_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " mirror advertise")
 
-			mirrorrawdata = requeststring[len('MIRRORADVERTISE'):]
+			mirrorrawdata = requeststring[len(b'MIRRORADVERTISE'):]
 
 			# handle the case where the mirror provides data that is larger than
 			# we want to serve
@@ -228,8 +227,8 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			# Let's sanity check the data...
 			# can we unpack it?
 			try:
-				mirrorinfodict = msgpack.unpackb(mirrorrawdata)
-			except (TypeError, ValueError), e:
+				mirrorinfodict = msgpack.unpackb(mirrorrawdata, raw=False)
+			except (TypeError, ValueError) as e:
 				session.sendmessage(self.request, "Error cannot unpack mirrorinfo!")
 				_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " cannot unpack mirrorinfo!" + str(e))
 				return
@@ -259,7 +258,7 @@ class ThreadedVendorRequestHandler(SocketServer.BaseRequestHandler):
 			return
 
 		# add HELLO
-		elif requeststring == 'HELLO':
+		elif requeststring == b'HELLO':
 			# send a reply.
 			session.sendmessage(self.request, "VENDORHI!")
 			_log("RAID-PIR Vendor " + remoteip + " " + str(remoteport) + " VENDORHI!")
@@ -284,8 +283,8 @@ def start_vendor_service(manifestdict, ip, port):
 	vendorserver = ThreadedVendorServer((ip, port), ThreadedVendorRequestHandler)
 
 	_log('vendor servers started at' + str(ip) + ':' + str(port))
-	print "Vendor Server started at", ip, ":", port
-	print "Manifest contains", len(manifestdict['fileinfolist']), "files in", manifestdict['blockcount'], "blocks of size", manifestdict['blocksize'], "B"
+	print("Vendor Server started at", ip, ":", port)
+	print("Manifest contains", len(manifestdict['fileinfolist']), "files in", manifestdict['blockcount'], "blocks of size", manifestdict['blocksize'], "B")
 
 	# and serve forever!
 	vendorserver.serve_forever()
@@ -356,11 +355,11 @@ def parse_options():
 
 	# check the maxmirrorinfo
 	if _commandlineoptions.maxmirrorinfo <= 0:
-		print "Max mirror info size must be positive"
+		print("Max mirror info size must be positive")
 		sys.exit(1)
 
 	if remainingargs:
-		print "Unknown options", remainingargs
+		print("Unknown options", remainingargs)
 		sys.exit(1)
 
 	# try to open the log file...
@@ -372,7 +371,7 @@ def main():
 	global _global_rawmirrorlist
 
 	# read in the manifest file
-	rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+	rawmanifestdata = open(_commandlineoptions.manifestfilename, 'rb').read()
 
 	# an ugly hack, but Python's request handlers don't have an easy way to thread to handle it pass arguments
 	_global_rawmanifestdata = rawmanifestdata
@@ -412,11 +411,11 @@ def main():
 if __name__ == '__main__':
 	parse_options()
 	try:
-		print "RAID-PIR Vendor", lib.pirversion
+		print("RAID-PIR Vendor", lib.pirversion)
 		main()
-	except Exception, e:
+	except Exception as e:
 		# log errors to prevent silent exiting...
-		print(str(type(e)) + " " + str(e))
+		print((str(type(e)) + " " + str(e)))
 		# this mess prints a not-so-nice traceback, but it does contain all relevant info
 		_log(str(traceback.format_tb(sys.exc_info()[2])))
 		sys.exit(1)

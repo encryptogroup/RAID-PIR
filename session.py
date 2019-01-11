@@ -1,44 +1,28 @@
 # This module wraps communications in a signaling protocol.	 The purpose is to
 # overlay a connection-based protocol with explicit message signaling.
 #
-# The protocol is to send the size of the message followed by \n and then the
-# message itself.	 The size of a message must be able to be stored in
-# sessionmaxdigits.	 A size of -1 indicates that this side of the connection
+# The protocol is to send the size of the message of length lengthbytes followed by the
+# message itself. A size of -1 indicates that this side of the connection
 # should be considered closed.
 
 class SessionEOF(Exception):
 	pass
 
-# this limits the size of a message to 10**20.	 Should be good enough
-sessionmaxdigits = 20
+# messages are at most 32 bit = 4 bytes long
+lengthbytes = 4
 
 # get the next message off of the socket...
 def recvmessage(socketobj):
 
-	messagesizestring = ''
-	# first, read the number of characters...
-	for _ in xrange(sessionmaxdigits):
-		currentbyte = socketobj.recv(1)
+	# receive length of next message
+	msglen = socketobj.recv(lengthbytes)
+	messagesize = int.from_bytes(msglen, byteorder = 'big', signed=True)
 
-		if currentbyte == '\n':
-			break
-
-		# not a valid digit
-		if currentbyte not in '0123456789' and messagesizestring != '' and currentbyte != '-':
-			raise ValueError("Bad message size")
-
-		messagesizestring = messagesizestring + currentbyte
-
-	else:
-		# too large
-		# raise ValueError, "Bad message size" #TODO check that this is correct
-		return ''
-
-	messagesize = int(messagesizestring)
+	#print("rcv", messagesize, end="")
 
 	# nothing to read...
 	if messagesize == 0:
-		return ''
+		return b''
 
 	# end of messages
 	if messagesize == -1:
@@ -47,17 +31,20 @@ def recvmessage(socketobj):
 	if messagesize < 0:
 		raise ValueError("Bad message size")
 
-	data = ''
+	data = b''
 	while len(data) < messagesize:
 		chunk =	socketobj.recv(messagesize-len(data))
-		if chunk == '':
+		if chunk == b'':
 			raise SessionEOF("Connection Closed")
 		data = data + chunk
+
+	#print(":", data[:8])
 
 	return data
 
 # a private helper function
 def _sendhelper(socketobj, data):
+	#print("send", len(data), ":", str(data[0:8]), "...")
 	sentlength = 0
 	# if I'm still missing some, continue to send (I could have used sendall
 	# instead but this isn't supported in reply currently)
@@ -67,6 +54,11 @@ def _sendhelper(socketobj, data):
 
 # send the message
 def sendmessage(socketobj, data):
-	header = str(len(data)) + '\n'
-	_sendhelper(socketobj, header)
+	# the length
+	_sendhelper(socketobj, len(data).to_bytes(lengthbytes, byteorder = 'big', signed=True))
+
+	if type(data) == str:
+		data = str.encode(data)
+
+	#the data
 	_sendhelper(socketobj, data)

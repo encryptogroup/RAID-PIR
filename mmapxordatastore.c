@@ -3,9 +3,11 @@
  * Purpose: A simple, C-based datastore that uses mmap to access the database.
  */
 
-#include "Python.h"
-#include "mmapxordatastore.h"
+// use Py_ssize_t instead of int for length arguments passed from Python to C
+#define PY_SSIZE_T_CLEAN
 
+#include <Python.h>
+#include "mmapxordatastore.h"
 
 // This should be *waaaay* more than we would ever need
 #define STARTING_XORDATASTORE_TABLESIZE 16
@@ -89,7 +91,7 @@ static datastore_descriptor do_mmap(long block_size, long num_blocks, char* file
 			close(dbfd);
 
 			// check for valid header
-			if (strncmp((char*) xordatastoretable[i].datastore, "RAIDPIRDB_v0.9.3", 16) != 0){
+			if (strncmp((char*) xordatastoretable[i].datastore, "RAIDPIRDB_v0.9.5", 16) != 0){
 				printf("%s is not a valid RAID-PIR db!\n", filename);
 				exit(1);
 			}
@@ -202,7 +204,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	char *raw_resultbuffer;
 	__m128i *resultbuffer;
 
-	if (!PyArg_ParseTuple(args, "is#", &ds, &bitstringbuffer, &bitstringlength)) {
+	if (!PyArg_ParseTuple(args, "iy#", &ds, &bitstringbuffer, &bitstringlength)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -225,7 +227,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, resultbuffer);
 
 	// okay, let's put it in a buffer
-	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
+	PyObject *return_str_obj = Py_BuildValue("y#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
 
 	// clear the buffer
 	free(raw_resultbuffer);
@@ -246,7 +248,7 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	__m128i *resultbuffer;
 
 
-	if (!PyArg_ParseTuple(args, "is#I", &ds, &bitstringbuffer, &bitstringlength, &numstrings)) {
+	if (!PyArg_ParseTuple(args, "iy#I", &ds, &bitstringbuffer, &bitstringlength, &numstrings)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -268,7 +270,7 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer);
 
 	// okay, let's put it in a buffer
-	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
+	PyObject *return_str_obj = Py_BuildValue("y#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
 
 	// clear the buffer
 	free(raw_resultbuffer);
@@ -304,7 +306,7 @@ static PyObject *GetData(PyObject *module, PyObject *args) {
 		return NULL;
 	}
 
-	return Py_BuildValue("s#", ((char *)xordatastoretable[ds].datastore)+offset, quantity);
+	return Py_BuildValue("y#", ((char *)xordatastoretable[ds].datastore)+offset, quantity);
 
 }
 
@@ -394,7 +396,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 	char *useddestbuffer;
 
 	// Parse the calling arguments
-	if (!PyArg_ParseTuple(args, "s#s#", &str1, &length, &str2, &length)) {
+	if (!PyArg_ParseTuple(args, "y#y#", &str1, &length, &str2, &length)) {
 		return NULL;
 	}
 
@@ -417,7 +419,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 	fast_XOR(useddestbuffer, str2, length);
 
 	// Okay, let's return the answer!
-	PyObject *return_str_obj = Py_BuildValue("s#", useddestbuffer, length);
+	PyObject *return_str_obj = Py_BuildValue("y#", useddestbuffer, length);
 
 	// (after freeing the buffer)
 	free(destbuffer);
@@ -426,8 +428,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 
 }
 
-
-static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
+static PyMethodDef mmapXORDatastoreMethods [] = {
 	{"Initialize", Initialize, METH_VARARGS, "Initialize a datastore."},
 	{"Deallocate", Deallocate, METH_VARARGS, "Deallocate a datastore."},
 	{"GetData", GetData, METH_VARARGS, "Reads data out of a datastore."},
@@ -437,7 +438,15 @@ static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 	{NULL, NULL, 0, NULL}
 };
 
+static struct PyModuleDef mmapXORDatastoreModule = {
+    PyModuleDef_HEAD_INIT,
+    "mmapxordatastore_c",
+    NULL,
+    -1,
+    mmapXORDatastoreMethods
+};
 
-PyMODINIT_FUNC initmmapxordatastore_c(void) {
-	Py_InitModule("mmapxordatastore_c", MyFastSimpleXORDatastoreMethods);
+PyMODINIT_FUNC PyInit_mmapxordatastore_c(void)
+{
+    return PyModule_Create(&mmapXORDatastoreModule);
 }

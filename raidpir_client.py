@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 <Author>
 	Daniel Demmler
@@ -5,7 +6,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	December 2014
+	January 2019
 
 <Description>
 	Client code for retrieving RAID-PIR files. This program uses a manifest
@@ -102,7 +103,7 @@ def _request_helper(rxgobj, tid):
 			# request the XOR block...
 			lib.request_xorblock(socket, bitstring)
 
-		except Exception, e:
+		except Exception as e:
 			if 'socked' in str(e):
 				rxgobj.notify_failure(thisrequest)
 				sys.stdout.write('F')
@@ -142,7 +143,7 @@ def _request_helper_chunked(rxgobj, tid):
 			else: # only chunks (redundancy)
 				lib.request_xorblock_chunked(socket, chunks)
 
-		except Exception, e:
+		except Exception as e:
 			if 'socked' in str(e):
 				rxgobj.notify_failure(thisrequest)
 				sys.stdout.write('F')
@@ -187,7 +188,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 		# use commandlineoption
 		mirrorinfolist = lib.retrieve_mirrorinfolist(_commandlineoptions.vendorip)
 
-	print "Mirrors: ", mirrorinfolist
+	print("Mirrors: ", mirrorinfolist)
 
 	if _commandlineoptions.timing:
 		setup_start = _timer()
@@ -203,13 +204,13 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			_timing_log.write(str(len(rxgobj.activemirrors[0]['blockbitstringlist']))+"\n")
 			_timing_log.write(str(len(rxgobj.activemirrors[0]['blockbitstringlist']))+"\n")
 
-		print "Blocks to request:", len(rxgobj.activemirrors[0]['blockbitstringlist'])
+		print("Blocks to request:", len(rxgobj.activemirrors[0]['blockbitstringlist']))
 
 		if _commandlineoptions.timing:
 			req_start = _timer()
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
-		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
+		for tid in range(_commandlineoptions.numberofmirrors - 1):
 			threading.Thread(target=_request_helper, args=[rxgobj, tid]).start()
 
 		_request_helper(rxgobj, _commandlineoptions.numberofmirrors - 1)
@@ -228,10 +229,10 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			_timing_log.write(str(len(rxgobj.activemirrors[0]['blocksneeded']))+"\n")
 			_timing_log.write(str(len(rxgobj.activemirrors[0]['blockchunklist']))+"\n")
 
-		print "# Blocks needed:", len(rxgobj.activemirrors[0]['blocksneeded'])
+		print("# Blocks needed:", len(rxgobj.activemirrors[0]['blocksneeded']))
 
 		if parallel:
-			print "# Requests:", len(rxgobj.activemirrors[0]['blockchunklist'])
+			print("# Requests:", len(rxgobj.activemirrors[0]['blockchunklist']))
 
 		#chunk lengths in BYTE
 		global chunklen
@@ -243,7 +244,7 @@ def request_blocks_from_mirrors(requestedblocklist, manifestdict, redundancy, rn
 			req_start = _timer()
 
 		# let's fire up the requested number of threads.   Our thread will also participate (-1 because of us!)
-		for tid in xrange(_commandlineoptions.numberofmirrors - 1):
+		for tid in range(_commandlineoptions.numberofmirrors - 1):
 			threading.Thread(target=_request_helper_chunked, args=[rxgobj, tid]).start()
 
 		_request_helper_chunked(rxgobj, _commandlineoptions.numberofmirrors - 1)
@@ -333,8 +334,8 @@ def request_files_from_mirrors(requestedfilelist, redundancy, rng, parallel, man
 
 		# open the filename w/o the dir and write it
 		filenamewithoutpath = os.path.basename(filename)
-		open(filenamewithoutpath, "w").write(filedata)
-		print "wrote", filenamewithoutpath
+		open(filenamewithoutpath, "wb").write(filedata)
+		print("wrote", filenamewithoutpath)
 
 
 ########################## Option parsing and main ###########################
@@ -416,26 +417,26 @@ def parse_options():
 
 	# k >= 2
 	if _commandlineoptions.numberofmirrors < 2:
-		print "Mirrors to contact must be > 1"
+		print("Mirrors to contact must be > 1")
 		sys.exit(1)
 
 	# r >= 2
 	if _commandlineoptions.redundancy != None and _commandlineoptions.redundancy < 2:
-		print "Redundancy must be > 1"
+		print("Redundancy must be > 1")
 		sys.exit(1)
 
 	# r <= k
-	if _commandlineoptions.redundancy > _commandlineoptions.numberofmirrors:
-		print "Redundancy must be less or equal to number of mirrors (", _commandlineoptions.numberofmirrors, ")"
+	if _commandlineoptions.redundancy != None and (_commandlineoptions.redundancy > _commandlineoptions.numberofmirrors):
+		print("Redundancy must be less or equal to number of mirrors (", _commandlineoptions.numberofmirrors, ")")
 		sys.exit(1)
 
 	# RNG or parallel query without chunks activated
 	if (_commandlineoptions.rng or _commandlineoptions.parallel) and not _commandlineoptions.redundancy:
-		print "Chunks must be enabled and redundancy set (-r <number>) to use RNG or parallel queries!"
+		print("Chunks must be enabled and redundancy set (-r <number>) to use RNG or parallel queries!")
 		sys.exit(1)
 
 	if len(remainingargs) == 0 and _commandlineoptions.printfiles == False:
-		print "Must specify at least one file to retrieve!"
+		print("Must specify at least one file to retrieve!")
 		sys.exit(1)
 
 	#filename(s)
@@ -484,11 +485,11 @@ def main():
 		manifestdict = lib.parse_manifest(rawmanifestdata)
 
 		# ...and write it out if it's okay
-		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
+		open(_commandlineoptions.manifestfilename, "wb").write(rawmanifestdata)
 
 	else:
 		# Simply read it in from disk
-		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+		rawmanifestdata = open(_commandlineoptions.manifestfilename, "rb").read()
 
 		manifestdict = lib.parse_manifest(rawmanifestdata)
 
@@ -498,11 +499,11 @@ def main():
 	filelist = lib.get_filenames_in_release(manifestdict)
 
 	if (manifestdict['blockcount'] < _commandlineoptions.numberofmirrors * 8) and _commandlineoptions.redundancy != None:
-		print "Block count too low to use chunks! Try reducing the block size or add more files to the database."
+		print("Block count too low to use chunks! Try reducing the block size or add more files to the database.")
 		sys.exit(1)
 
 	if _commandlineoptions.printfiles:
-		print "Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:\n", filelist
+		print("Manifest - Blocks:", manifestdict['blockcount'], "x", manifestdict['blocksize'], "Byte - Files:\n", filelist)
 
 	if _commandlineoptions.timing:
 		_timing_log.write(str(manifestdict['blocksize']) + "\n")
@@ -512,7 +513,7 @@ def main():
 	for filename in _commandlineoptions.filestoretrieve:
 
 		if filename not in filelist:
-			print "The file", filename, "is not listed in the manifest."
+			print("The file", filename, "is not listed in the manifest.")
 			sys.exit(2)
 
 	# don't run PIR if we're just printing the filenames in the manifest
@@ -520,7 +521,7 @@ def main():
 		request_files_from_mirrors(_commandlineoptions.filestoretrieve, _commandlineoptions.redundancy, _commandlineoptions.rng, _commandlineoptions.parallel, manifestdict)
 
 if __name__ == '__main__':
-	print "RAID-PIR Client", lib.pirversion
+	print("RAID-PIR Client", lib.pirversion)
 	parse_options()
 
 	if _commandlineoptions.timing:

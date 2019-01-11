@@ -21,8 +21,8 @@ typedef struct {
 
 // Define all of the functions...
 
-static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, long count);
-static inline void XOR_byteblocks(char *dest, const char *data, long count);
+static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, Py_ssize_t count);
+static inline void XOR_byteblocks(char *dest, const char *data, Py_ssize_t count);
 static inline char *dword_align(char *ptr);
 static int is_table_entry_used(int i);
 static datastore_descriptor allocate(long block_size, long num_blocks);
@@ -37,6 +37,6 @@ static PyObject *GetData(PyObject *module, PyObject *args);
 static void deallocate(datastore_descriptor ds);
 static PyObject *Deallocate(PyObject *module, PyObject *args);
 static PyObject *DoPreprocessing(PyObject *module, PyObject *args);
-static char *slow_XOR(char *dest, const char *data, unsigned long stringlength);
-static char *fast_XOR(char *dest, const char *data, unsigned long stringlength);
+static char *slow_XOR(char *dest, const char *data, Py_ssize_t stringlength);
+static char *fast_XOR(char *dest, const char *data, Py_ssize_t stringlength);
 static PyObject *do_xor(PyObject *module, PyObject *args);

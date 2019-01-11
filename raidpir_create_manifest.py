@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 <Author>
 	Daniel Demmler
@@ -5,7 +6,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	October 2014
+	January 2019
 
 <Description>
 	Creates a manifest from the files in a directory.   This takes a set of
@@ -50,8 +51,8 @@ import raidpirlib as lib
 import optparse
 
 # Check the python version
-if sys.version_info[0] != 2 or sys.version_info[1] != 7:
-	print "Requires Python 2.7"
+if sys.version_info[0] != 3 or sys.version_info[1] < 5:
+	print("Requires Python >= 3.5")
 	sys.exit(1)
 
 import msgpack
@@ -105,7 +106,7 @@ def parse_options():
 
 	# check the arguments
 	if len(remainingargs) != 3:
-		print "Requires exactly three additional arguments: rootdir blocksize vendorhostname"
+		print("Requires exactly three additional arguments: rootdir blocksize vendorhostname")
 		sys.exit(1)
 
 	# add these to the object to parse later...
@@ -116,15 +117,15 @@ def parse_options():
 	commandlineoptions.vendorhostname = remainingargs[2]
 
 	if commandlineoptions.blocksize <= 0:
-		print "Specified blocksize number is not positive"
+		print("Specified blocksize number is not positive")
 		sys.exit(1)
 
 	if commandlineoptions.blocksize % 64:
-		print "Blocksize must be divisible by 64"
+		print("Blocksize must be divisible by 64")
 		sys.exit(1)
 
 	if commandlineoptions.vendorport <= 0 or commandlineoptions.vendorport > 65535:
-		print "Invalid vendorport"
+		print("Invalid vendorport")
 		sys.exit(1)
 
 	return commandlineoptions
@@ -132,7 +133,7 @@ def parse_options():
 
 if __name__ == '__main__':
 
-	print "RAID-PIR create manifest", lib.pirversion
+	print("RAID-PIR create manifest", lib.pirversion)
 	# parse user provided data
 	commandlineoptions = parse_options()
 
@@ -145,10 +146,10 @@ if __name__ == '__main__':
 		vendorport=commandlineoptions.vendorport)
 
 	# open the destination file
-	manifestfo = open(commandlineoptions.manifestfile, 'w')
+	manifestfo = open(commandlineoptions.manifestfile, 'wb')
 
 	# and write it in a safely serialized format (msgpack).
-	rawmanifest = msgpack.packb(manifestdict)
+	rawmanifest = msgpack.packb(manifestdict, use_bin_type=True)
 	manifestfo.write(rawmanifest)
 
 	manifestfo.close()
@@ -156,4 +157,4 @@ if __name__ == '__main__':
 	if commandlineoptions.database != None:
 		lib._write_db(commandlineoptions.rootdir, commandlineoptions.database)
 
-	print "Generated manifest", commandlineoptions.manifestfile, "with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.'
+	print("Generated manifest", commandlineoptions.manifestfile, "with", manifestdict['blockcount'], manifestdict['blocksize'], 'Byte blocks.')

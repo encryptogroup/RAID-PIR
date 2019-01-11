@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	December 2014
+	January 2019
 
 <Description>
 	Library code that emulates the upPIR fastsimpleXORdatastore in C. This is likely to only
@@ -163,7 +163,7 @@ class XORDatastore(object):
 
 		"""
 
-		if type(block_size) != int and type(block_size) != long:
+		if type(block_size) != int and type(block_size) != int:
 			raise TypeError("Block size must be an integer")
 
 		if block_size <= 0:
@@ -172,7 +172,7 @@ class XORDatastore(object):
 		if block_size % 64 != 0:
 			raise TypeError("Block size must be a multiple of 64")
 
-		if type(num_blocks) != int and type(num_blocks) != long:
+		if type(num_blocks) != int and type(num_blocks) != int:
 			raise TypeError("Number of blocks must be an integer")
 
 		if num_blocks <= 0:
@@ -261,7 +261,7 @@ class XORDatastore(object):
 			None
 
 		"""
-		if type(offset) != int and type(offset) != long:
+		if type(offset) != int and type(offset) != int:
 			raise TypeError("Offset must be an integer")
 
 		if offset < 0:
@@ -319,13 +319,13 @@ class XORDatastore(object):
 			A string containing the data.
 
 		"""
-		if type(offset) != int and type(offset) != long:
+		if type(offset) != int and type(offset) != int:
 			raise TypeError("Offset must be an integer")
 
 		if offset < 0:
 			raise TypeError("Offset must be non-negative")
 
-		if type(quantity) != int and type(quantity) != long:
+		if type(quantity) != int and type(quantity) != int:
 			raise TypeError("Quantity must be an integer")
 
 		if quantity <= 0:

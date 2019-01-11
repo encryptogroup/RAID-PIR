@@ -19,15 +19,15 @@ import mmapxordatastore_c
 import math
 
 
-def do_xor(string_a, string_b):
+def do_xor(bytes_a, bytes_b):
 
-	if type(string_a) != str or type(string_b) != str:
-		raise TypeError("do_xor called with a non-string")
+	if type(bytes_a) != bytes or type(bytes_b) != bytes:
+		raise TypeError("do_xor must be called with bytes")
 
-	if len(string_a) != len(string_b):
-		raise ValueError("do_xor requires strings of the same length")
+	if len(bytes_a) != len(bytes_b):
+		raise ValueError("do_xor requires byte types of the same length")
 
-	return fastsimplexordatastore_c.do_xor(string_a, string_b)
+	return fastsimplexordatastore_c.do_xor(bytes_a, bytes_b)
 
 
 class XORDatastore(object):
@@ -70,7 +70,7 @@ class XORDatastore(object):
 
 		"""
 
-		if type(block_size) != int and type(block_size) != long:
+		if type(block_size) != int and type(block_size) != int:
 			raise TypeError("Block size must be an integer")
 
 		if block_size <= 0:
@@ -79,7 +79,7 @@ class XORDatastore(object):
 		if block_size % 64 != 0:
 			raise TypeError("Block size must be a multiple of 64 bytes")
 
-		if type(num_blocks) != int and type(num_blocks) != long:
+		if type(num_blocks) != int and type(num_blocks) != int:
 			raise TypeError("Number of blocks must be an integer")
 
 		if num_blocks <= 0:
@@ -106,7 +106,7 @@ class XORDatastore(object):
 			a string of the size of the datastore blocks
 
 		<Arguments>
-			bitstring: a string of bits that indicates what to XOR.   The length
+			bitstring: bytes that indicates what to XOR.   The length
 								 of this string must be ceil(numberofblocks / 8.0).   Extra
 								 bits are ignored (e.g. if there are 10 blocks, the last
 								 six bits are ignored).
@@ -118,8 +118,8 @@ class XORDatastore(object):
 			The XORed block.
 
 		"""
-		if type(bitstring) != str:
-			raise TypeError("bitstring must be a string")
+		if type(bitstring) != bytes:
+			raise TypeError("bitstring must be of type bytes")
 
 		if len(bitstring) != math.ceil(self.numberofblocks/8.0):
 			raise TypeError("bitstring is not of the correct length")
@@ -147,8 +147,8 @@ class XORDatastore(object):
 			The XORed block.
 
 		"""
-		if type(bitstring) != str:
-			raise TypeError("bitstring must be a string")
+		if type(bitstring) != bytes:
+			raise TypeError("bitstring must be of type bytes")
 
 		if len(bitstring) != math.ceil(self.numberofblocks / 8.0)*num_strings :
 			raise TypeError("bitstring is not of the correct length")
@@ -175,14 +175,14 @@ class XORDatastore(object):
 			None
 
 		"""
-		if type(offset) != int and type(offset) != long:
+		if type(offset) != int and type(offset) != int:
 			raise TypeError("Offset must be an integer")
 
 		if offset < 0:
 			raise TypeError("Offset must be non-negative")
 
-		if type(data_to_add) != str:
-			raise TypeError("Data_to_add to XORdatastore must be a string.")
+		if type(data_to_add) != bytes:
+			raise TypeError("Data_to_add to XORdatastore must be bytes.")
 
 		if offset + len(data_to_add) > self.numberofblocks * self.sizeofblocks:
 			raise TypeError("Offset + added data overflows the XORdatastore")
@@ -207,13 +207,13 @@ class XORDatastore(object):
 			A string containing the data.
 
 		"""
-		if type(offset) != int and type(offset) != long:
+		if type(offset) != int and type(offset) != int:
 			raise TypeError("Offset must be an integer")
 
 		if offset < 0:
 			raise TypeError("Offset must be non-negative")
 
-		if type(quantity) != int and type(quantity) != long:
+		if type(quantity) != int and type(quantity) != int:
 			raise TypeError("Quantity must be an integer")
 
 		if quantity <= 0:

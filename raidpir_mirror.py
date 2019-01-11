@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 <Author>
 	Daniel Demmler
@@ -6,7 +6,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	December 2014
+	January 2019
 
 <Description>
 	Mirror code that serves RAID-PIR files.   A client obtains a list of live
@@ -62,7 +62,7 @@ import threading
 import getmyip
 
 # to handle protocol requests
-import SocketServer
+import socketserver
 
 # to run in the background...
 import daemon
@@ -74,7 +74,7 @@ import time
 try:
 	import msgpack
 except ImportError:
-	print "Requires MsgPack module (http://msgpack.org/)"
+	print("Requires MsgPack module (http://msgpack.org/)")
 	sys.exit(1)
 
 _logfo = None
@@ -82,7 +82,7 @@ _timer = time.time
 
 def _log(stringtolog):
 	"""helper function to log data"""
-	_logfo.write(str(time.time()) +" "+stringtolog+"\n")
+	_logfo.write(str(time.process_time()) +" "+stringtolog+"\n")
 	_logfo.flush()
 
 _global_myxordatastore = None
@@ -128,7 +128,7 @@ def BatchAnswer(parallel, chunknumbers, sock):
 			batchrequests = _batchrequests
 			xorstrings = _xorstrings
 			_batchrequests = 0
-			_xorstrings = ""
+			_xorstrings = b''
 
 		if batchrequests == 0:
 			# all request answered, remove flag and wait/return
@@ -141,28 +141,28 @@ def BatchAnswer(parallel, chunknumbers, sock):
 				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests*len(chunknumbers))
 				_batch_comp_time = _batch_comp_time + _timer() - start_time
 				i = 0
-				for _ in xrange(batchrequests):
+				for _ in range(batchrequests):
 					result = {}
 					for c in chunknumbers:
 						result[c] = xoranswer[i*blocksize : (i+1)*blocksize]
 						i = i + 1
 
-					session.sendmessage(sock, msgpack.packb(result))
+					session.sendmessage(sock, msgpack.packb(result, use_bin_type=True))
 
 			else:
 				xoranswer = _global_myxordatastore.produce_xor_from_multiple_bitstrings(xorstrings, batchrequests)
 				_batch_comp_time = _batch_comp_time + _timer() - start_time
-				for i in xrange(batchrequests):
+				for i in range(batchrequests):
 					session.sendmessage(sock, xoranswer[i*blocksize : (i+1)*blocksize])
 
 
 ############################### Serve via RAID-PIR ###############################
 
 # I don't need to change this much, I think...
-class ThreadedXORServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedXORServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 	allow_reuse_address = True
 
-class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
+class ThreadedXORRequestHandler(socketserver.BaseRequestHandler):
 
 	def handle(self):
 
@@ -178,12 +178,12 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 		comp_time = 0
 		_batch_comp_time = 0
 		_batchrequests = 0
-		_xorstrings = ""
+		_xorstrings = b''
 		parallel = False
 
-		requeststring = '0'
+		requeststring = b'0'
 
-		while requeststring != 'Q':
+		while requeststring != b'Q':
 			# read the request from the socket...
 			requeststring = session.recvmessage(self.request)
 
@@ -193,9 +193,9 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 			start_time = _timer()
 
 			# if it's a request for a XORBLOCK
-			if requeststring.startswith('X'):
+			if requeststring.startswith(b'X'):
 
-				bitstring = requeststring[len('X'):]
+				bitstring = requeststring[len(b'X'):]
 				expectedbitstringlength = lib.bits_to_bytes(_global_myxordatastore.numberofblocks)
 
 				if len(bitstring) != expectedbitstringlength:
@@ -226,11 +226,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				# done!
 
-			elif requeststring.startswith('C'):
+			elif requeststring.startswith(b'C'):
 
-				payload = requeststring[len('C'):]
+				payload = requeststring[len(b'C'):]
 
-				chunks = msgpack.unpackb(payload)
+				chunks = msgpack.unpackb(payload, raw=False)
 
 				bitstring = lib.build_bitstring_from_chunks(chunks, k, chunklen, lastchunklen)
 
@@ -253,11 +253,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				#done!
 
-			elif requeststring.startswith('R'):
+			elif requeststring.startswith(b'R'):
 
-				payload = requeststring[len('R'):]
+				payload = requeststring[len(b'R'):]
 
-				chunks = msgpack.unpackb(payload)
+				chunks = msgpack.unpackb(payload, raw=False)
 
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
@@ -291,16 +291,16 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 
 				#done!
 
-			elif requeststring == 'MANIFEST UPDATE':
-				print "MANIFEST UPDATE"
+			elif requeststring == b'MANIFEST UPDATE':
+				print("MANIFEST UPDATE")
 				_request_restart = True
 
-			elif requeststring.startswith('M'):
+			elif requeststring.startswith(b'M'):
 				parallel = True
 
-				payload = requeststring[len('M'):]
+				payload = requeststring[len(b'M'):]
 
-				chunks = msgpack.unpackb(payload)
+				chunks = msgpack.unpackb(payload, raw=False)
 
 				#iterate through r-1 random chunks
 				for c in chunknumbers[1:]:
@@ -324,7 +324,7 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					comp_time = comp_time + _timer() - start_time
 
 					# and send the reply.
-					session.sendmessage(self.request, msgpack.packb(result))
+					session.sendmessage(self.request, msgpack.packb(result, use_bin_type=True))
 				else:
 					with _batchlock:
 						for c in chunknumbers:
@@ -337,11 +337,11 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" GOOD")
 				#done!
 
-			elif requeststring.startswith('P'):
+			elif requeststring.startswith(b'P'):
 
-				payload = requeststring[len('P'):]
+				payload = requeststring[len(b'P'):]
 
-				params = msgpack.unpackb(payload)
+				params = msgpack.unpackb(payload, raw=False)
 
 				chunknumbers = params['cn']
 				k = params['k']
@@ -361,31 +361,31 @@ class ThreadedXORRequestHandler(SocketServer.BaseRequestHandler):
 					t.start()
 
 				# and send the reply.
-				session.sendmessage(self.request, "PARAMS OK")
+				session.sendmessage(self.request, b"PARAMS OK")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" PARAMS received " + str(params))
 				#done!
 
 			#Timing Request
-			elif requeststring == 'T':
-				session.sendmessage(self.request, "T" + str(comp_time + _batch_comp_time))
+			elif requeststring == b'T':
+				session.sendmessage(self.request, b"T" + str(comp_time + _batch_comp_time))
 				comp_time = 0
 				_batch_comp_time = 0
 
 			#Debug Hello
-			elif requeststring == 'HELLO':
-				session.sendmessage(self.request, "HI!")
+			elif requeststring == b'HELLO':
+				session.sendmessage(self.request, b"HI!")
 				#_log("RAID-PIR "+remoteip+" "+str(remoteport)+" HI!")
 				# done!
 
 			#the client asked to close the connection
-			elif requeststring == 'Q':
+			elif requeststring == b'Q':
 				comp_time = 0
 				_finish = True
 				_batchevent.set()
 				return
 
 			#this happens if the client closed the socket unexpectedly
-			elif requeststring == '':
+			elif requeststring == b'':
 				comp_time = 0
 				_finish = True
 				_batchevent.set()
@@ -418,16 +418,16 @@ def service_raidpir_clients(myxordatastore, ip, port):
 
 
 ################################ Serve via HTTP ###############################
-import BaseHTTPServer
-import urlparse
+import http.server
+import urllib.parse
 
 # handle a HTTP request
-class MyHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class MyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
 	def do_GET(self):
 
 		# get the path part of the request.   Ignore the host name, etc.
-		requestedfilename = urlparse.urlparse(self.path).path
+		requestedfilename = urllib.parse.urlparse(self.path).path
 
 		# if there is a leading '/' then kill it.
 		if requestedfilename.startswith('/'):
@@ -462,7 +462,7 @@ def service_http_clients(myxordatastore, manifestdict, ip, port):
 	assert _global_myxordatastore != None
 	assert _global_manifestdict != None
 
-	httpserver = BaseHTTPServer.HTTPServer((ip, port), MyHTTPRequestHandler)
+	httpserver = http.server.HTTPServer((ip, port), MyHTTPRequestHandler)
 
 	# and serve forever! Just like with RAID-PIR, this doesn't return so we need a new thread...
 	threading.Thread(target=httpserver.serve_forever, name="HTTP server").start()
@@ -480,7 +480,7 @@ def retrieve_manifest_dict():
 		manifestdict = lib.parse_manifest(rawmanifestdata)
 
 		# ...and write it out if it's okay
-		open(_commandlineoptions.manifestfilename, "w").write(rawmanifestdata)
+		open(_commandlineoptions.manifestfilename, "wb").write(rawmanifestdata)
 
 	else:
 		# Simply read it in from disk
@@ -567,23 +567,23 @@ def parse_options():
 		_commandlineoptions.ip = getmyip.getmyip()
 
 	if _commandlineoptions.port <= 0 or _commandlineoptions.port > 65535:
-		print "Specified port number out of range"
+		print("Specified port number out of range")
 		sys.exit(1)
 
 	if _commandlineoptions.httpport <= 0 or _commandlineoptions.httpport > 65535:
-		print "Specified HTTP port number out of range"
+		print("Specified HTTP port number out of range")
 		sys.exit(1)
 
 	if _commandlineoptions.mirrorlistadvertisedelay < 0:
-		print "Mirror advertise delay must be positive"
+		print("Mirror advertise delay must be positive")
 		sys.exit(1)
 
 	if remainingargs:
-		print "Unknown options", remainingargs
+		print("Unknown options", remainingargs)
 		sys.exit(1)
 
 	if not (_commandlineoptions.database == None) ^ (_commandlineoptions.files == None):
-		print "Must specify either files or database"
+		print("Must specify either files or database")
 		sys.exit(1)
 
 	# try to open the log file...
@@ -608,11 +608,11 @@ def main():
 		daemon.daemonize()
 
 	if _commandlineoptions.database != None:
-		print "Using mmap datastore"
+		print("Using mmap datastore")
 		dstype = "mmap"
 		source = _commandlineoptions.database
 	else:
-		print "Using RAM datastore"
+		print("Using RAM datastore")
 		dstype = "RAM"
 		source = _commandlineoptions.files
 
@@ -620,11 +620,11 @@ def main():
 
 	if dstype == "RAM":
 		# now let's put the content in the datastore in preparation to serve it
-		print "Loading data into RAM datastore..."
-		start = time.clock()
+		print("Loading data into RAM datastore...")
+		start = _timer()
 		lib.populate_xordatastore(manifestdict, myxordatastore, source, dstype, _commandlineoptions.use_precomputed_data)
-		elapsed = (time.clock() - start)
-		print "Datastore initialized. Took %f seconds." % elapsed
+		elapsed = (_timer() - start)
+		print("Datastore initialized. Took %f seconds." % elapsed)
 
 	# we're now ready to handle clients!
 	#_log('ready to start servers!')
@@ -635,7 +635,7 @@ def main():
 	_batchlock = threading.Lock()
 	_batchevent = threading.Event()
 	_batchrequests = 0
-	_xorstrings = ""
+	_xorstrings = b''
 
 	# first, let's fire up the RAID-PIR server
 	xorserver = service_raidpir_clients(myxordatastore, _commandlineoptions.ip, _commandlineoptions.port)
@@ -645,7 +645,7 @@ def main():
 		service_http_clients(myxordatastore, manifestdict, _commandlineoptions.ip, _commandlineoptions.httpport)
 
 	#_log('servers started!')
-	print "Mirror Server started at", _commandlineoptions.ip, ":", _commandlineoptions.port
+	print("Mirror Server started at", _commandlineoptions.ip, ":", _commandlineoptions.port)
 
 	# let's send the mirror information periodically...
 	# we should log any errors...
@@ -657,11 +657,11 @@ def main():
 			counter = 0
 			try:
 				_send_mirrorinfo()
-			except Exception, e:
+			except Exception as e:
 				_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))
 
 		if _request_restart:
-			print "Shutting down"
+			print("Shutting down")
 			xorserver.shutdown()
 			sys.exit(0)
 
@@ -669,13 +669,13 @@ def main():
 		time.sleep(1)
 
 if __name__ == '__main__':
-	print "RAID-PIR mirror", lib.pirversion
+	print("RAID-PIR mirror", lib.pirversion)
 	parse_options()
 	try:
 		main()
-	except Exception, e:
+	except Exception as e:
 		# log errors to prevent silent exiting...
-		print str(type(e))+" "+str(e)
+		print(str(type(e))+" "+str(e))
 		# this mess prints a not-so-nice traceback, but it does contain all
 		# relevant info
 		_log(str(e) + "\n" + str(traceback.format_tb(sys.exc_info()[2])))

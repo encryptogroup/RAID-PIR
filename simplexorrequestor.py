@@ -5,7 +5,7 @@
 	(inspired from a previous version by Geremy Condra)
 
 <Date>
-	December 2014
+	Janaury 2019
 
 """
 
@@ -31,7 +31,7 @@ try:
 	#for packing more complicated messages
 	import msgpack
 except ImportError:
-	print "Requires MsgPack module (http://msgpack.org/)"
+	print("Requires MsgPack module (http://msgpack.org/)")
 	sys.exit(1)
 
 import os
@@ -48,7 +48,7 @@ def rcvlet(mirror, rxgobj):
 	sock = mirror['info']['sock']
 
 	# first, check if params were received correctly
-	if session.recvmessage(sock) != 'PARAMS OK':
+	if session.recvmessage(sock) != b'PARAMS OK':
 		raise Exception("Params were not delivered correctly or wrong format.")
 
 	data = "0"
@@ -77,10 +77,10 @@ def _reconstruct_block_parallel(responses, chunklen, k, blocklen, blocknumbers):
 	results = {}
 	for blocknum in blocknumbers:
 		#map blocknum to chunk
-		index = min(blocknum/chunklen, k-1)
+		index = min(int(blocknum/chunklen), k-1)
 
 		if index not in results:
-			results[index] = blocklen*"\0"
+			results[index] = blocklen*b'\0'
 
 	for m in range(k):
 		for c in results:
@@ -212,7 +212,7 @@ class RandomXORRequestor(Requestor):
 			params['p'] = False
 
 			#send the params, rcvlet will check response
-			session.sendmessage(thisrequestinfo['info']['sock'], "P" + msgpack.packb(params))
+			session.sendmessage(thisrequestinfo['info']['sock'], b"P" + msgpack.packb(params, use_bin_type=True))
 
 			# start separate receiving thread for this socket
 			t = threading.Thread(target=rcvlet, args=[thisrequestinfo, self], name=("rcv_thread_" + str((thisrequestinfo['info']['ip'], thisrequestinfo['info']['port']))))
@@ -228,8 +228,8 @@ class RandomXORRequestor(Requestor):
 				thisrequestinfo['blockbitstringlist'].append(lib.randombits(manifestdict['blockcount']))
 
 		# now, let's do the 'derived' ones...
-		for blocknum in xrange(len(blocklist)):
-			thisbitstring = '\0'*bitstringlength
+		for blocknum in range(len(blocklist)):
+			thisbitstring = b'\0'*bitstringlength
 
 			# xor the random strings together
 			for requestinfo in self.activemirrors[:-1]:
@@ -436,7 +436,7 @@ class RandomXORRequestorChunks(Requestor):
 
 		#length of one chunk in BITS (1 bit per block)
 		#chunk length of the first chunks must be a multiple of 8, last chunk can be longer than first chunks
-		self.chunklen = (self.blockcount/8/privacythreshold) * 8
+		self.chunklen = int(self.blockcount/8/privacythreshold) * 8
 		self.lastchunklen = self.blockcount - (privacythreshold-1)*self.chunklen
 
 		if len(mirrorinfolist) < self.privacythreshold:
@@ -466,7 +466,7 @@ class RandomXORRequestorChunks(Requestor):
 
 			# chunk numbers [0, ..., r-1]
 			mirror['chunknumbers'] = [i]
-			for j in xrange(1, redundancy):
+			for j in range(1, redundancy):
 				mirror['chunknumbers'].append((i+j) % privacythreshold)
 			i = i + 1
 
@@ -497,7 +497,7 @@ class RandomXORRequestorChunks(Requestor):
 				params['s'] = mirror['seed']
 
 			#send the params, rcvlet will check response
-			session.sendmessage(mirror['info']['sock'], "P" + msgpack.packb(params))
+			session.sendmessage(mirror['info']['sock'], b"P" + msgpack.packb(params, use_bin_type=True))
 
 			# start separate receiving thread for this socket
 			t = threading.Thread(target=rcvlet, args=[mirror, self], name=("rcv_thread_" + str((mirror['info']['ip'], mirror['info']['port']))))
@@ -515,7 +515,7 @@ class RandomXORRequestorChunks(Requestor):
 
 			#map block numbers to chunks
 			for blocknum in blocklist:
-				index = min(blocknum/self.chunklen, privacythreshold-1)
+				index = min(int(blocknum/self.chunklen), privacythreshold-1)
 				blockchunks[index].append(blocknum)
 
 			#remove chunks that are still empty
@@ -567,7 +567,7 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = lib.bits_to_bytes(length)*'\0'
+					thisbitstring = lib.bits_to_bytes(length)*b'\0'
 
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrors:
@@ -629,7 +629,7 @@ class RandomXORRequestorChunks(Requestor):
 						length = self.chunklen
 
 					#fill it with zero
-					thisbitstring = lib.bits_to_bytes(length)*'\0'
+					thisbitstring = lib.bits_to_bytes(length)*b'\0'
 
 					#xor all other rnd chunks onto it
 					for rqi in self.activemirrors:
@@ -794,7 +794,7 @@ class RandomXORRequestorChunks(Requestor):
 						blocknumbers = mirror['blocksrequested'].pop(0)
 
 						# add the xorblocks to the dict
-						self.returnedxorblocksdict[blocknumbers[0]].append(msgpack.unpackb(xorblock))
+						self.returnedxorblocksdict[blocknumbers[0]].append(msgpack.unpackb(xorblock, raw=False))
 
 						#print "Appended blocknumber", blocknumbers[0], "from", thismirrorsinfo['port']
 
@@ -810,12 +810,12 @@ class RandomXORRequestorChunks(Requestor):
 
 						for blocknumber in blocknumbers:
 
-							index = min(blocknumber/self.chunklen, self.privacythreshold-1)
+							index = min(int(blocknumber/self.chunklen), self.privacythreshold-1)
 
 							# let's check the hash...
 							resultingblockhash = lib.find_hash(resultingblockdict[index], self.manifestdict['hashalgorithm'])
 							if resultingblockhash != self.manifestdict['blockhashlist'][blocknumber]:
-								print mirror
+								print(mirror)
 								# TODO: We should notify the vendor!
 								raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt, for blocknumber ' + str(blocknumber))
 
@@ -847,7 +847,7 @@ class RandomXORRequestorChunks(Requestor):
 						# let's check the hash...
 						resultingblockhash = lib.find_hash(resultingblock, self.manifestdict['hashalgorithm'])
 						if resultingblockhash != self.manifestdict['blockhashlist'][blocknumber]:
-							print mirror
+							print(mirror)
 							# TODO: We should notify the vendor!
 							raise Exception('Should notify vendor that one of the mirrors or manifest is corrupt')
 

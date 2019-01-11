@@ -3,7 +3,10 @@
  * Purpose: The fastsimplexordatastore.   A simple, C-based datastore
  */
 
-#include "Python.h"
+// use Py_ssize_t instead of int for length arguments passed from Python to C
+#define PY_SSIZE_T_CLEAN
+
+#include <Python.h>
 #include "fastsimplexordatastore.h"
 
 /* I've decided not to mess with making this a Python object.
@@ -26,7 +29,7 @@ static XORDatastore xordatastoretable[STARTING_XORDATASTORE_TABLESIZE];
 
 
 // Helper
-static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, long count) {
+static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, Py_ssize_t count) {
 	register long i;
 	for (i=0; i<count; i++) {
 		*dest = _mm_xor_si128(*data, *dest);
@@ -37,7 +40,7 @@ static inline void XOR_fullblocks(__m128i *dest, const __m128i *data, long count
 
 
 // Helper
-static inline void XOR_byteblocks(char *dest, const char *data, long count) {
+static inline void XOR_byteblocks(char *dest, const char *data, Py_ssize_t count) {
 	register long i;
 	for (i=0; i<count; i++) {
 		*dest++ ^= *data++;
@@ -419,14 +422,14 @@ static void bitstring_xor_worker(int ds, char *bit_string, long bit_string_lengt
 // Python Wrapper object
 static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	datastore_descriptor ds;
-	int bitstringlength;
+	Py_ssize_t bitstringlength;
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
 	__m128i *resultbuffer;
 	char use_precomputed_data;
 
 
-	if (!PyArg_ParseTuple(args, "is#b", &ds, &bitstringbuffer, &bitstringlength, &use_precomputed_data)) {
+	if (!PyArg_ParseTuple(args, "iy#b", &ds, &bitstringbuffer, &bitstringlength, &use_precomputed_data)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -447,7 +450,7 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 	bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, resultbuffer, use_precomputed_data);
 
 	// okay, let's put it in a buffer
-	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock);
+	PyObject *return_str_obj = Py_BuildValue("y#", (char *)resultbuffer, xordatastoretable[ds].sizeofablock);
 
 	// clear the buffer
 	free(raw_resultbuffer);
@@ -461,14 +464,14 @@ static PyObject *Produce_Xor_From_Bitstring(PyObject *module, PyObject *args) {
 // Python Wrapper object
 static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	datastore_descriptor ds;
-	int bitstringlength;
+	Py_ssize_t bitstringlength;
 	unsigned int numstrings;
 	char *bitstringbuffer;
 	char *raw_resultbuffer;
 	__m128i *resultbuffer;
 	char use_precomputed_data;
 
-	if (!PyArg_ParseTuple(args, "is#Ib", &ds, &bitstringbuffer, &bitstringlength, &numstrings, &use_precomputed_data)) {
+	if (!PyArg_ParseTuple(args, "iy#Ib", &ds, &bitstringbuffer, &bitstringlength, &numstrings, &use_precomputed_data)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -490,7 +493,7 @@ static PyObject *Produce_Xor_From_Bitstrings(PyObject *module, PyObject *args) {
 	multi_bitstring_xor_worker(ds, bitstringbuffer, bitstringlength, numstrings, resultbuffer, use_precomputed_data);
 
 	// okay, let's put it in a buffer
-	PyObject *return_str_obj = Py_BuildValue("s#",(char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
+	PyObject *return_str_obj = Py_BuildValue("y#", (char *)resultbuffer, xordatastoretable[ds].sizeofablock * numstrings);
 
 	// clear the buffer
 	free(raw_resultbuffer);
@@ -506,10 +509,10 @@ static PyObject *SetData(PyObject *module, PyObject *args) {
 	long long offset;
 	datastore_descriptor ds;
 	char *stringbuffer;
-	int quantity; // BUG: This probably should be a larger type.
+	Py_ssize_t quantity;
 
 
-	if (!PyArg_ParseTuple(args, "iLs#", &ds, &offset, &stringbuffer, &quantity)) {
+	if (!PyArg_ParseTuple(args, "iLy#", &ds, &offset, &stringbuffer, &quantity)) {
 		// Incorrect args...
 		return NULL;
 	}
@@ -561,8 +564,7 @@ static PyObject *GetData(PyObject *module, PyObject *args) {
 		return NULL;
 	}
 
-	return Py_BuildValue("s#", ((char *)xordatastoretable[ds].datastore)+offset, quantity);
-
+	return Py_BuildValue("y#", ((char *)xordatastoretable[ds].datastore)+offset, quantity);
 }
 
 
@@ -629,14 +631,14 @@ static PyObject *DoPreprocessing(PyObject *module, PyObject *args) {
 
 
 // I just have this around for testing
-static char *slow_XOR(char *dest, const char *data, unsigned long stringlength) {
+static char *slow_XOR(char *dest, const char *data, Py_ssize_t stringlength) {
 	XOR_byteblocks(dest, data, stringlength);
 	return dest;
 }
 
 
 // This XORs data with the starting data in dest
-static char *fast_XOR(char *dest, const char *data, unsigned long stringlength) {
+static char *fast_XOR(char *dest, const char *data, Py_ssize_t stringlength) {
 	int leadingmisalignedbytes;
 	long fulllengthblocks;
 	int remainingbytes;
@@ -680,12 +682,12 @@ static char *fast_XOR(char *dest, const char *data, unsigned long stringlength) 
 // the client to compute the result and XOR bitstrings
 static PyObject *do_xor(PyObject *module, PyObject *args) {
 	const char *str1, *str2;
-	long length;
+	Py_ssize_t length;
 	char *destbuffer;
 	char *useddestbuffer;
 
 	// Parse the calling arguments
-	if (!PyArg_ParseTuple(args, "s#s#", &str1, &length, &str2, &length)) {
+	if (!PyArg_ParseTuple(args, "y#y#", &str1, &length, &str2, &length)) {
 		return NULL;
 	}
 
@@ -708,7 +710,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 	fast_XOR(useddestbuffer, str2, length);
 
 	// Okay, let's return the answer!
-	PyObject *return_str_obj = Py_BuildValue("s#", useddestbuffer, length);
+	PyObject *return_str_obj = Py_BuildValue("y#", useddestbuffer, length);
 
 	// (after freeing the buffer)
 	free(destbuffer);
@@ -717,8 +719,7 @@ static PyObject *do_xor(PyObject *module, PyObject *args) {
 
 }
 
-
-static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
+static PyMethodDef FastSimpleXORDatastoreMethods [] = {
 	{"Allocate", Allocate, METH_VARARGS, "Allocate a datastore."},
 	{"Deallocate", Deallocate, METH_VARARGS, "Deallocate a datastore."},
 	{"GetData", GetData, METH_VARARGS, "Reads data out of a datastore."},
@@ -731,6 +732,15 @@ static PyMethodDef MyFastSimpleXORDatastoreMethods [] = {
 };
 
 
-PyMODINIT_FUNC initfastsimplexordatastore_c(void) {
-	Py_InitModule("fastsimplexordatastore_c", MyFastSimpleXORDatastoreMethods);
+static struct PyModuleDef MyFastSimpleXORDatastoreModule = {
+    PyModuleDef_HEAD_INIT,
+    "fastsimplexordatastore_c",
+    NULL,
+    -1,
+    FastSimpleXORDatastoreMethods
+};
+
+PyMODINIT_FUNC PyInit_fastsimplexordatastore_c(void)
+{
+    return PyModule_Create(&MyFastSimpleXORDatastoreModule);
 }
