@@ -1,6 +1,5 @@
 # RAID-PIR
 
-
 RAID-PIR is an efficient implementation of [private information retrieval](https://en.wikipedia.org/wiki/Private_information_retrieval) with multiple servers.
 
 Details of the underlying protocols can be found in the paper "[RAID-PIR: Practical Multi-Server PIR](http://encrypto.de/papers/DHS14.pdf)" published at the [6th ACM Cloud Computing Security Workshop (ACM CCSW'14)](http://digitalpiglet.org/nsac/ccsw14/) by:
@@ -10,17 +9,17 @@ Details of the underlying protocols can be found in the paper "[RAID-PIR: Practi
 
 This code is an extension of [upPIR](https://uppir.poly.edu) and large parts of it were written by the upPIR maintainers. A big thanks to [Justin Cappos](https://isis.poly.edu/~jcappos/) for making the original upPIR code publicly available.
 
-Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de) or create an issue here on github.
+Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-spride.de) or create an issue here on GitHub.
 
 **Warning:** This code is **not** meant to be used for a productive environment and is intended for testing and demonstrational purposes only.
 
 ### Requirements
-* Python 2.7
+* Python >=3.5
   * [PyCrypto](https://www.dlitz.net/software/pycrypto/) (might require `python-dev` package to build)
   * [MsgPack](http://msgpack.org/)
   * [numpy](http://www.numpy.org/)
 * `gcc` (Version 4.x or newer should be fine)
-* some sort of somewhat recent Unix (We tested everything on Debian, but MacOS should be OK as well; Windows might work but was never tested...)
+* some sort of somewhat recent Unix (We tested everything on Manjaro Linux, but MacOS should be OK as well; Windows might work but was never tested...)
 
 ## Setting up RAID-PIR Instances and Testing
 
@@ -28,7 +27,7 @@ Please send code-related questions to [Daniel Demmler](mailto:daniel.demmler@ec-
 
 The following steps describe how to set up instances of an RAID-PIR vendor, mirrors, and client for testing the code locally.
 
-Before you start, make sure you checked out the most recent version from github.
+Before you start, make sure you checked out the most recent version from GitHub.
 
 #### 1.1 Fast XOR
 To have fast XOR operations, you'll need to build some C code. To do this you have to run `python setup.py build`.
@@ -56,7 +55,7 @@ dd@deb:~/workspace/RAID-PIR/test/vendor$ ls ../files/
 1.jpg  1.pdf  2.jpg  2.pdf  3.jpg
 
 dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_create_manifest.py ../files/ 4096 127.0.0.1
-RAID-PIR create manifest v0.9.2
+RAID-PIR create manifest v0.9.5
 Fileinfolist generation done.
 Indexing done ...
 Offset-Dict generated.
@@ -76,7 +75,7 @@ Example:
 
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/vendor$ python raidpir_vendor.py
-RAID-PIR Vendor v0.9.2
+RAID-PIR Vendor v0.9.5
 Vendor Server started at 127.0.0.1 : 62293
 ```
 
@@ -91,7 +90,7 @@ Example:
 
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/mirror1$ python raidpir_mirror.py --ip 127.0.0.1 --port 62001 --files ../files/ --retrievemanifestfrom 127.0.0.1 --precompute
-RAID-PIR mirror v0.9.2
+RAID-PIR mirror v0.9.5
 Mirror Server started at 127.0.0.1 : 62001
 ```
 
@@ -99,7 +98,7 @@ We can run another mirror instance in a different terminal. You will need to cha
 
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/mirror2$ python raidpir_mirror.py --ip 127.0.0.1 --port 62002 --files ../files/ --retrievemanifestfrom 127.0.0.1 --precompute
-RAID-PIR mirror v0.9.2
+RAID-PIR mirror v0.9.5
 Mirror Server started at 127.0.0.1 : 62002
 ```
 
@@ -115,7 +114,7 @@ Command: `python raidpir_client.py [--retrievemanifestfrom <IP:PORT>] <FILENAME>
 Example:
 ```bash
 dd@deb:~/workspace/RAID-PIR/test/client$ python raidpir_client.py --retrievemanifestfrom 127.0.0.1:62293 1.jpg
-RAID-PIR Client v0.9.2
+RAID-PIR Client v0.9.5
 Mirrors:  [{'ip': '127.0.0.1', 'port': 62002}, {'ip': '127.0.0.1', 'port': 62003}, {'ip': '127.0.0.1', 'port': 62001}]
 Blocks to request: 25
 wrote 1.jpg
@@ -128,7 +127,7 @@ Once you've retrieved the manifest, you can download other files without re-retr
 You can activate several optimizations for the client by specifying command line arguments.
 * `-r <number>` activates chunks and sets the redundancy parameter
 * `-R` activates randomness expansion from a seed
-* `-p` activates parallel multi-block queries
+* `-p` activates parallel multi-block queries (MB)
 
 Please see [our RAID-PIR paper](http://encrypto.de/papers/DHS14.pdf) for a detailed explanation of how these optimizations work.
 
