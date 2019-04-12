@@ -483,8 +483,8 @@ def retrieve_manifest_dict():
 		open(_commandlineoptions.manifestfilename, "wb").write(rawmanifestdata)
 
 	else:
-		# Simply read it in from disk
-		rawmanifestdata = open(_commandlineoptions.manifestfilename).read()
+		# Read manifest from disk
+		rawmanifestdata = open(_commandlineoptions.manifestfilename, "rb").read()
 		manifestdict = lib.parse_manifest(rawmanifestdata)
 
 	return manifestdict
