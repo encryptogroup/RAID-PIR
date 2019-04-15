@@ -135,7 +135,7 @@ Please see [our RAID-PIR paper](http://encrypto.de/papers/DHS14.pdf) for a detai
 
 You should be able to use Ctrl+C to end RAID-PIR processes. Sometimes this might not work due to the multi-threading in RAID-PIR. If in doubt, check your process manager and see if you really terminated all RAID-PIR processes.
 
-A quick-and-dirty solution to this problem is to end all python3 processes using `killall python` (**Warning:** This will also end all other python3 processes, not just RAID-PIR!).
+A quick-and-dirty solution to this problem is to end all python3 processes using `killall python3` (**Warning:** This will also end all other python3 processes, not just RAID-PIR!).
 In case RAID-PIR still won't terminate properly, try `killall -9 python3` (**Warning:** This will most definitely also end all other python3 processes!). If you know how to solve this more elegantly, please let me know.
 
 You can then re-run the code and your changes will be taken into account.
