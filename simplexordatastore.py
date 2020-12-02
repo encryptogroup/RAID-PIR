@@ -19,13 +19,13 @@ import math
 import numpy
 
 
-def do_xor(string_a, string_b):
+def do_xor(bytes_a, bytes_b):
 	"""
 	<Purpose>
 		Produce the XOR of two equal length strings
 
 	<Arguments>
-		string_a, string_b: the strings to XOR
+		bytes_a, bytes_b: the strings to XOR
 
 	<Exceptions>
 		ValueError if the strings are of unequal lengths
@@ -34,25 +34,25 @@ def do_xor(string_a, string_b):
 	<Returns>
 		The XORed result.
 	"""
-	if type(string_a) != str or type(string_b) != str:
-		raise TypeError("do_xor called with a non-string")
+	if type(bytes_a) != bytes or type(bytes_b) != bytes:
+		raise TypeError("do_xor must be called with bytes")
 
-	if len(string_a) != len(string_b):
-		raise ValueError("do_xor requires strings of the same length")
+	if len(bytes_a) != len(bytes_b):
+		raise ValueError("do_xor requires byte arrays of the same length")
 
-	n_a = numpy.frombuffer(string_a, dtype='uint8')
-	n_b = numpy.frombuffer(string_b, dtype='uint8')
+	n_a = numpy.frombuffer(bytes_a, dtype='uint8')
+	n_b = numpy.frombuffer(bytes_b, dtype='uint8')
 
 	return (n_a ^ n_b).tostring()
 
 
-def do_xor_blocks(string_a, string_b):
+def do_xor_blocks(bytes_a, bytes_b):
 	"""
 	<Purpose>
 		Produce the XOR of two equal length strings with length of a multiple of 8 byte / 64 bit
 
 	<Arguments>
-		string_a, string_b: the strings to XOR, both equal length, multiple of 64 bit
+		bytes_a, bytes_b: the strings to XOR, both equal length, multiple of 64 bit
 
 	<Exceptions>
 		ValueError if the strings are of unequal lengths
@@ -61,14 +61,14 @@ def do_xor_blocks(string_a, string_b):
 	<Returns>
 		The XORed result.
 	"""
-	if type(string_a) != str or type(string_b) != str:
-		raise TypeError("do_xor called with a non-string")
+	if type(bytes_a) != bytes or type(bytes_b) != bytes:
+		raise TypeError("do_xor_blocks must be called with bytes")
 
-	if len(string_a) != len(string_b):
-		raise ValueError("do_xor requires strings of the same length")
+	if len(bytes_a) != len(bytes_b):
+		raise ValueError("do_xor_blocks requires byte arrays of the same length")
 
-	n_a = numpy.frombuffer(string_a, dtype='uint64')
-	n_b = numpy.frombuffer(string_b, dtype='uint64')
+	n_a = numpy.frombuffer(bytes_a, dtype='uint64')
+	n_b = numpy.frombuffer(bytes_b, dtype='uint64')
 
 	return (n_a ^ n_b).tostring()
 
@@ -186,7 +186,7 @@ class XORDatastore(object):
 		# will serve as padding if there are 'gaps' in the data added.
 		self._blocks = []
 		for _ in range(self.numberofblocks):
-			self._blocks.append(chr(0) * self.sizeofblocks)
+			self._blocks.append(b'\x00' * self.sizeofblocks)
 
 
 	def produce_xor_from_bitstring(self, bitstring):
@@ -208,14 +208,14 @@ class XORDatastore(object):
 			The XORed block.
 
 		"""
-		if type(bitstring) != str:
-			raise TypeError("bitstring must be a string")
+		if type(bitstring) != bytes:
+			raise TypeError("bitstring must be bytes")
 
 		if len(bitstring) != math.ceil(self.numberofblocks / 8.0):
 			raise TypeError("bitstring is not of the correct length")
 
 		# start with an empty string of the right size...
-		currentblock = chr(0) * self.sizeofblocks
+		currentblock = b'\x00' * self.sizeofblocks
 
 		# This is the block we are looking at now
 		currentblocknumber = 0
@@ -228,7 +228,7 @@ class XORDatastore(object):
 				bitvalue = 2 ** (7 - bitnumber)
 
 				# If it's a one...
-				if ord(thisbyte) & bitvalue:
+				if thisbyte & bitvalue:
 
 					# ... and we're not past the end of the string...
 					if currentblocknumber < self.numberofblocks:
@@ -267,8 +267,8 @@ class XORDatastore(object):
 		if offset < 0:
 			raise TypeError("Offset must be non-negative")
 
-		if type(data_to_add) != str:
-			raise TypeError("Data_to_add to XORdatastore must be a string.")
+		if type(data_to_add) != bytes:
+			raise TypeError("Data_to_add to XORdatastore must be bytes.")
 
 		if offset + len(data_to_add) > self.numberofblocks * self.sizeofblocks:
 			raise TypeError("Offset + added data overflows the XORdatastore")
@@ -367,7 +367,7 @@ class XORDatastore(object):
 		assert offset >= 0
 		assert offset <= self.numberofblocks * self.sizeofblocks
 
-		return (offset / self.sizeofblocks, offset % self.sizeofblocks)
+		return (int(offset / self.sizeofblocks), offset % self.sizeofblocks)
 
 
 	def __del__(self):  # deallocate
