@@ -643,8 +643,13 @@ static char *fast_XOR(char *dest, const char *data, Py_ssize_t stringlength) {
 	long fulllengthblocks;
 	int remainingbytes;
 
+	if (stringlength < 1) {
+		printf("Error: Bytes to XOR must be at least 1 (and positive)! Got %ld.\n", stringlength);
+		return NULL;
+	}
+
 	// If it's shorter than a block, use char-based XOR
-	if (stringlength <= sizeof(__m128i)) {
+	if ((size_t)stringlength <= sizeof(__m128i)) {
 		return slow_XOR(dest, data, stringlength);
 	}
 
